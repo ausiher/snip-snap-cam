@@ -529,10 +529,10 @@ function renderCollage(canvas, photos, title, activeTheme, collageLayout) {
       dc.fillStyle = cfg.downloadMetaInk;
       dc.fillText(new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase(), 500, 105);
       const cells = [
-        { x: 80, y: 150, w: 380, h: 360 },
-        { x: 540, y: 150, w: 380, h: 360 },
-        { x: 80, y: 550, w: 380, h: 360 },
-        { x: 540, y: 550, w: 380, h: 360 }
+        { x: 50, y: 140, w: 420, h: 385 },
+        { x: 530, y: 140, w: 420, h: 385 },
+        { x: 50, y: 565, w: 420, h: 385 },
+        { x: 530, y: 565, w: 420, h: 385 }
       ];
       const drawGridCell = (photo, cell) => {
         dc.fillStyle = '#ffffff';
@@ -542,16 +542,16 @@ function renderCollage(canvas, photos, title, activeTheme, collageLayout) {
         dc.strokeRect(cell.x, cell.y, cell.w, cell.h);
         const img = new Image();
         img.onload = () => {
-          const pad = 12;
-          const photoH = cell.h - 60;
+          const pad = 10;
+          const photoH = cell.h - 44;
           drawImageContain(dc, img, cell.x + pad, cell.y + pad, cell.w - pad * 2, photoH);
           dc.font = 'bold 13px Courier New, monospace';
           dc.fillStyle = '#222';
           dc.textAlign = 'left';
-          dc.fillText(photo.caption || `SNAP #${String(photo.frameNum).padStart(2, '0')}`, cell.x + pad + 2, cell.y + cell.h - 36);
+          dc.fillText(photo.caption || `SNAP #${String(photo.frameNum).padStart(2, '0')}`, cell.x + pad + 2, cell.y + cell.h - 26);
           dc.font = '10px Courier New, monospace';
           dc.fillStyle = '#666';
-          dc.fillText(`${photo.date}  ${photo.time}`, cell.x + pad + 2, cell.y + cell.h - 18);
+          dc.fillText(`${photo.date}  ${photo.time}`, cell.x + pad + 2, cell.y + cell.h - 10);
           checkResolve();
         };
         img.src = photo.dataUrl;
@@ -1200,14 +1200,27 @@ function mainLoop() {
       }
     }
 
-    // Run Face Landmarker if active and loaded
+    // Run Face Landmarker if active and loaded (Optimized: runs on alternate frames to save mobile CPU/GPU)
+    if (!state.faceFrameCount) state.faceFrameCount = 0;
+    state.faceFrameCount++;
+
+    let faceDetected = false;
+    let results = null;
+
     if (faceLandmarker && elements.webcam && elements.webcam.readyState >= 2) {
       const now = performance.now();
       const dt = now - (state.lastFaceTime || now);
       state.lastFaceTime = now;
 
-      const results = faceLandmarker.detectForVideo(elements.webcam, now);
+      if (state.faceFrameCount % 2 === 0) {
+        results = faceLandmarker.detectForVideo(elements.webcam, now);
+        state.lastFaceResults = results;
+      } else {
+        results = state.lastFaceResults;
+      }
+
       if (results && results.faceLandmarks && results.faceLandmarks.length > 0) {
+        faceDetected = true;
         if (engine) {
           engine.updateParameters({
             blend: state.faceFilterActive ? 1.0 : 0.0,
@@ -1222,10 +1235,10 @@ function mainLoop() {
           engine.process(results, dt);
           engine.render(elements.webcam);
         }
-      } else {
-        drawRawWebcamToDeformed();
       }
-    } else {
+    }
+
+    if (!faceDetected) {
       drawRawWebcamToDeformed();
     }
 

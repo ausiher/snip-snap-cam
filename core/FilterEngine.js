@@ -80,6 +80,7 @@ export class FilterEngine {
 
       uniform float u_blend;
       uniform float u_before_after;
+      uniform float u_aspect;
 
       vec2 rotate(vec2 v, float alpha) {
         float c = cos(alpha);
@@ -95,12 +96,16 @@ export class FilterEngine {
         }
 
         vec2 pixel = v_texCoord;
-        vec2 d = pixel - u_face_center;
+        
+        // Map to aspect-ratio corrected isotropic space (multiply X by aspect)
+        vec2 uv_iso = vec2(pixel.x * u_aspect, pixel.y);
+        vec2 center_iso = vec2(u_face_center.x * u_aspect, u_face_center.y);
+        vec2 d = uv_iso - center_iso;
 
         // Convert to local face-space coordinates
         vec2 local = rotate(d, -u_face_angle) / u_face_scale;
 
-        // 1. Eye Size deformation (comical small to big, multiplier increased to 0.85/0.65)
+        // 1. Eye Size deformation (comical small to big)
         // Left Eye
         float dEL = distance(local, u_eye_left);
         if (dEL < 0.22) {
@@ -116,7 +121,7 @@ export class FilterEngine {
           local = u_eye_right + (local - u_eye_right) * k;
         }
 
-        // 2. Forehead Size deformation (comical small to big, multiplier increased to 0.9/0.65)
+        // 2. Forehead Size deformation (comical small to big)
         float dFH = distance(local, u_forehead_center);
         if (dFH < 0.32) {
           float w = smoothstep(0.32, 0.0, dFH);
@@ -124,7 +129,7 @@ export class FilterEngine {
           local.y = u_forehead_center.y + (local.y - u_forehead_center.y) * k;
         }
 
-        // 3. Chin Size deformation (comical small to big, multiplier increased to 0.85/0.65)
+        // 3. Chin Size deformation (comical small to big)
         float dJ = distance(local, u_jaw_center);
         if (dJ < 0.28) {
           float w = smoothstep(0.28, 0.0, dJ);
@@ -132,7 +137,7 @@ export class FilterEngine {
           local = u_jaw_center + (local - u_jaw_center) * k;
         }
 
-        // 4. Nose Size deformation (comical smaller to bigger, multiplier increased to 0.9/0.65)
+        // 4. Nose Size deformation (comical smaller to bigger)
         float dN = distance(local, u_nose);
         if (dN < 0.18) {
           float w = smoothstep(0.18, 0.0, dN);
@@ -140,7 +145,7 @@ export class FilterEngine {
           local = u_nose + (local - u_nose) * k;
         }
 
-        // 5. Mouth Size deformation (comical small to big, multiplier increased to 0.85/0.65)
+        // 5. Mouth Size deformation (comical small to big)
         vec2 mouthCenter = (u_mouth_left + u_mouth_right) * 0.5;
         float dM = distance(local, mouthCenter);
         if (dM < 0.24) {
@@ -149,9 +154,9 @@ export class FilterEngine {
           local = mouthCenter + (local - mouthCenter) * k;
         }
 
-        // Convert deformed local back to screen texture coordinates
+        // Convert deformed local back to screen texture coordinates (isotropic to normalized)
         vec2 deformed_d = rotate(local * u_face_scale, u_face_angle);
-        vec2 deformed_pixel = u_face_center + deformed_d;
+        vec2 deformed_pixel = vec2((center_iso.x + deformed_d.x) / u_aspect, center_iso.y + deformed_d.y);
 
         // Apply deformation blend fix (mix original UV coordinates and deformed UV coordinates)
         vec2 final_pixel = mix(v_texCoord, deformed_pixel, u_blend);
@@ -245,21 +250,11 @@ export class FilterEngine {
     this.faceCenter = { x: cx, y: cy };
 
     // 3. Compute rotation angle (using eye horizontal direction)
-    const elx = this.rawVertices[159 * 3];
-    const ely = this.rawVertices[159 * 3 + 1];
-    const erx = this.rawVertices[386 * 3];
-    const ery = this.rawVertices[386 * 3 + 1];
-    this.faceAngle = Math.atan2(ery - ely, erx - elx);
-
-    // 4. Compute scale factor (distance between eyes * 2.5)
-    const dx = erx - elx;
-    const dy = ery - ely;
-    this.faceScale = Math.sqrt(dx * dx + dy * dy) * 2.5;
-
-    // 5. Compute key local coordinates relative to center, rotated back
+        // 5. Compute key local coordinates relative to center, rotated back (aspect corrected)
+    const aspect = w / h;
     const toLocal = (lmIdx) => {
       const idx = lmIdx * 3;
-      const rx = this.rawVertices[idx] - cx;
+      const rx = (this.rawVertices[idx] - cx) * aspect; // aspect ratio scale
       const ry = this.rawVertices[idx + 1] - cy;
       // Rotate back by -angle
       const c = Math.cos(-this.faceAngle);
@@ -269,6 +264,17 @@ export class FilterEngine {
       // Scale normalize
       return { x: lx / this.faceScale, y: ly / this.faceScale };
     };
+
+    // Calculate aspect corrected face angle and scale
+    const elx = this.rawVertices[159 * 3] * aspect;
+    const ely = this.rawVertices[159 * 3 + 1];
+    const erx = this.rawVertices[386 * 3] * aspect;
+    const ery = this.rawVertices[386 * 3 + 1];
+    this.faceAngle = Math.atan2(ery - ely, erx - elx);
+
+    const dx = erx - elx;
+    const dy = ery - ely;
+    this.faceScale = Math.sqrt(dx * dx + dy * dy) * 2.5;
 
     this.localEyeLeft = toLocal(159);
     this.localEyeRight = toLocal(386);
@@ -350,6 +356,7 @@ export class FilterEngine {
     // Set global parameters
     setFloat("u_blend", this.blend);
     setFloat("u_before_after", this.beforeAfter ? 1.0 : 0.0);
+    setFloat("u_aspect", this.canvas.width / this.canvas.height);
 
     // Draw textured quad
     gl.drawArrays(gl.TRIANGLES, 0, 6);
