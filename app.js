@@ -250,55 +250,129 @@ function calcRect(cw, ch, hands) {
   const activeHands = hands.filter(h => h.isL || h.isFolded);
   if (activeHands.length !== 2) return null;
 
-  const A = getLCorner(activeHands[0].landmarks, cw, ch);
-  const B = getLCorner(activeHands[1].landmarks, cw, ch);
-  if (!A || !B) return null;
-
   const lm0 = activeHands[0].landmarks;
   const lm1 = activeHands[1].landmarks;
 
-  // Horizontal axis: vector pointing from corner A to corner B (the top edge)
-  let hzX = B.x - A.x;
-  let hzY = B.y - A.y;
-  const W = Math.sqrt(hzX * hzX + hzY * hzY);
-  if (W < 5) return null;
+  // 1. Same-hand double detection prevention:
+  // Calculate wrist-to-wrist distance in pixels and reject if too close.
+  const wristDist = Math.sqrt((lm0[0].x - lm1[0].x) ** 2 + (lm0[0].y - lm1[0].y) ** 2) * Math.max(cw, ch);
+  const p0_0 = { x: lm0[0].x * cw, y: lm0[0].y * ch };
+  const p9_0 = { x: lm0[9].x * cw, y: lm0[9].y * ch };
+  const palmDist = Math.sqrt(dist2dSq(p0_0, p9_0));
+  if (wristDist < palmDist * 2.5) {
+    return null;
+  }
 
-  // Normalize horizontal axis
-  hzX /= W;
-  hzY /= W;
+  // Get physical L-corner intersection points for both hands
+  const pt0 = getLCorner(lm0, cw, ch);
+  const pt1 = getLCorner(lm1, cw, ch);
+  if (!pt0 || !pt1) return null;
 
-  // Vertical axis: perpendicular pointing downwards on the screen (positive Y)
-  // since the index fingers form the top horizontal edge and the viewfinder
-  // extends down toward the wrists.
-  const upX = -hzY;
-  const upY = hzX;
+  // Ensure A is the left-most corner (smaller X) and B is the right-most corner (larger X)
+  const A = pt0.x < pt1.x ? pt0 : pt1;
+  const B = pt0.x < pt1.x ? pt1 : pt0;
 
-  // Height: average wrist-to-index finger length to define vertical span
-  const i0x = lm0[8].x * cw - lm0[0].x * cw;
-  const i0y = lm0[8].y * ch - lm0[0].y * ch;
-  const i1x = lm1[8].x * cw - lm1[0].x * cw;
-  const i1y = lm1[8].y * ch - lm1[0].y * ch;
-  const H = (Math.sqrt(i0x*i0x + i0y*i0y) + Math.sqrt(i1x*i1x + i1y*i1y)) * 0.5;
+  // Identify which landmark set belongs to A (left) and B (right)
+  const lmA = pt0.x < pt1.x ? lm0 : lm1;
+  const lmB = pt0.x < pt1.x ? lm1 : lm0;
 
-  // Center: midpoint of the top edge (A to B) shifted down by half the height
-  const Cx = (A.x + B.x) * 0.5 + upX * (H * 0.5);
-  const Cy = (A.y + B.y) * 0.5 + upY * (H * 0.5);
+  // Determine vertical direction from finger/wrist vectors:
+  // - Left hand (A): index fingertip points UP (tip8 - wrist0)
+  const tipA = { x: lmA[8].x * cw, y: lmA[8].y * ch };
+  const wristA = { x: lmA[0].x * cw, y: lmA[0].y * ch };
+  let vAx = tipA.x - wristA.x;
+  let vAy = tipA.y - wristA.y;
+  const lenVA = Math.sqrt(vAx*vAx + vAy*vAy);
+  if (lenVA > 0.001) { vAx /= lenVA; vAy /= lenVA; }
 
-  const theta = Math.atan2(hzY, hzX);
-  const hw = W * 0.5;
-  const hh = H * 0.5;
+  // - Right hand (B): index fingertip or thumb determines vertical axis
+  const tipB = { x: lmB[8].x * cw, y: lmB[8].y * ch };
+  const wristB = { x: lmB[0].x * cw, y: lmB[0].y * ch };
+  let vBx = tipB.x - wristB.x;
+  let vBy = tipB.y - wristB.y;
+  const lenVB = Math.sqrt(vBx*vBx + vBy*vBy);
+  if (lenVB > 0.001) { vBx /= lenVB; vBy /= lenVB; }
+
+  // Average vertical direction pointing screen-up (negative Y)
+  // Align vectors to point upwards (negative Y)
+  if (vAy > 0) { vAx = -vAx; vAy = -vAy; }
+  if (vBy > 0) { vBx = -vBx; vBy = -vBy; }
+  let upX = vAx + vBx;
+  let upY = vAy + vBy;
+  const lenUp = Math.sqrt(upX*upX + upY*upY);
+  if (lenUp > 0.001) {
+    upX /= lenUp;
+    upY /= lenUp;
+  } else {
+    upX = 0;
+    upY = -1;
+  }
+
+  // Horizontal axis perpendicular to UP, pointing to the right
+  const hzX = -upY;
+  const hzY = upX;
+
+  const dx = B.x - A.x;
+  const dy = B.y - A.y;
+
+  let center, W, H, theta, c1, c2, c3, c4, h3Bracket;
+
+  // Check if hands are at the same level (horizontal/bottom gesture)
+  if (Math.abs(dy) < Math.abs(dx) * 0.4) {
+    // Both hands are at the bottom of the viewfinder.
+    // Bottom-left corner = A, Bottom-right corner = B
+    W = Math.max(40, Math.sqrt(dx*dx + dy*dy));
+    // Average index-to-wrist span as the height
+    H = Math.max(40, (lenVA + lenVB) * 0.5);
+    theta = Math.atan2(B.y - A.y, B.x - A.x);
+
+    // Center shifted UP by half height from midpoint of A and B
+    center = {
+      x: (A.x + B.x) * 0.5 + upX * (H * 0.5),
+      y: (A.y + B.y) * 0.5 + upY * (H * 0.5)
+    };
+
+    c4 = A; // bottom-left
+    c3 = B; // bottom-right
+    c1 = { x: A.x + H * upX, y: A.y + H * upY }; // top-left
+    c2 = { x: B.x + H * upX, y: B.y + H * upY }; // top-right
+    h3Bracket = 'bottom-right';
+  } else {
+    // Diagonal gesture. A is bottom-left (larger Y), B is top-right (smaller Y).
+    const V = { x: B.x - A.x, y: B.y - A.y };
+    W = Math.max(40, Math.abs(V.x * hzX + V.y * hzY));
+    H = Math.max(40, Math.abs(V.x * upX + V.y * upY));
+    theta = Math.atan2(hzY, hzX);
+    center = { x: (A.x + B.x) * 0.5, y: (A.y + B.y) * 0.5 };
+
+    if (A.y > B.y) {
+      // A is bottom-left, B is top-right
+      c4 = A; // bottom-left
+      c2 = B; // top-right
+      c1 = { x: A.x + H * upX, y: A.y + H * upY }; // top-left
+      c3 = { x: A.x + W * hzX, y: A.y + W * hzY }; // bottom-right
+    } else {
+      // A is top-left, B is bottom-right
+      c1 = A; // top-left
+      c3 = B; // bottom-right
+      c4 = { x: A.x - H * upX, y: A.y - H * upY }; // bottom-left
+      c2 = { x: A.x + W * hzX, y: A.y + W * hzY }; // top-right
+    }
+    h3Bracket = 'top-right';
+  }
 
   return {
-    center: { x: Cx, y: Cy },
+    center,
     width: W,
     height: H,
     theta,
     h1: A,
     h3: B,
-    c1: { x: Cx - hw * hzX - hh * upX, y: Cy - hw * hzY - hh * upY }, // top-left (A)
-    c2: { x: Cx + hw * hzX - hh * upX, y: Cy + hw * hzY - hh * upY }, // top-right (B)
-    c3: { x: Cx + hw * hzX + hh * upX, y: Cy + hw * hzY + hh * upY }, // bottom-right
-    c4: { x: Cx - hw * hzX + hh * upX, y: Cy - hw * hzY + hh * upY }  // bottom-left
+    c1,
+    c2,
+    c3,
+    c4,
+    h3Bracket
   };
 }
 
@@ -1236,20 +1310,26 @@ function drawBorder(rect, cfg) {
     ctx2d.translate(rect.h1.x, rect.h1.y);
     ctx2d.rotate(rect.theta);
     ctx2d.beginPath();
-    ctx2d.moveTo(16, 0);
+    ctx2d.moveTo(16, 0);   // Horizontal (pointing right)
     ctx2d.lineTo(0, 0);
-    ctx2d.lineTo(0, 16);
+    ctx2d.lineTo(0, -16);  // Vertical (pointing up)
     ctx2d.stroke();
     ctx2d.restore();
   }
   if (rect.h3) {
     ctx2d.save();
     ctx2d.translate(rect.h3.x, rect.h3.y);
-    ctx2d.rotate(rect.theta + Math.PI);
+    ctx2d.rotate(rect.theta);
     ctx2d.beginPath();
-    ctx2d.moveTo(16, 0);
-    ctx2d.lineTo(0, 0);
-    ctx2d.lineTo(0, 16);
+    if (rect.h3Bracket === 'bottom-right') {
+      ctx2d.moveTo(-16, 0);  // Horizontal (pointing left)
+      ctx2d.lineTo(0, 0);
+      ctx2d.lineTo(0, -16);  // Vertical (pointing up)
+    } else {
+      ctx2d.moveTo(-16, 0);  // Horizontal (pointing left)
+      ctx2d.lineTo(0, 0);
+      ctx2d.lineTo(0, 16);   // Vertical (pointing down)
+    }
     ctx2d.stroke();
     ctx2d.restore();
   }
