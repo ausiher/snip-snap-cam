@@ -252,37 +252,44 @@ function calcRect(cw, ch, hands) {
   const A = getLCorner(activeHands[0].landmarks, cw, ch);
   const B = getLCorner(activeHands[1].landmarks, cw, ch);
   if (!A || !B) return null;
+
+  // Use A→B vector as the primary horizontal axis — stable, no 180° flips
+  const abDx = B.x - A.x;
+  const abDy = B.y - A.y;
+  const abLen = Math.sqrt(abDx * abDx + abDy * abDy);
+  if (abLen < 10) return null;
+
+  // Horizontal axis along A→B
+  const ux = abDx / abLen;
+  const uy = abDy / abLen;
+
+  // Vertical axis: perpendicular to A→B, biased upward (negative Y in screen space)
+  let vx = -uy, vy = ux;
+  if (vy > 0) { vx = uy; vy = -ux; } // always point upward
+
+  // Measure frame size based on index-finger span of each hand
   const lm0 = activeHands[0].landmarks;
-  const idxDx = lm0[8].x * cw - A.x;
-  const idxDy = lm0[8].y * ch - A.y;
-  const idxLen = Math.sqrt(idxDx * idxDx + idxDy * idxDy);
-  if (idxLen < 1) return null;
-  const vx = idxDx / idxLen, vy = idxDy / idxLen;
-  const thbDx = lm0[4].x * cw - A.x;
-  const thbDy = lm0[4].y * ch - A.y;
-  let ux = -vy, uy = vx;
-  if (ux * thbDx + uy * thbDy < 0) {
-    ux = vy;
-    uy = -vx;
-  }
+  const lm1 = activeHands[1].landmarks;
   const p0 = { x: lm0[0].x * cw, y: lm0[0].y * ch };
   const p9 = { x: lm0[9].x * cw, y: lm0[9].y * ch };
   const palmSize = Math.sqrt(dist2dSq(p0, p9));
-  const margin = palmSize * 0.42;
-  const Dx = B.x - A.x, Dy = B.y - A.y;
-  const d_u = Dx * ux + Dy * uy;
-  const d_v = Dx * vx + Dy * vy;
-  const W = Math.max(40, Math.abs(d_u) - margin * 2);
-  const H = Math.max(40, Math.abs(d_v) - margin * 2);
+
+  // Height: average index-tip to wrist distance across both hands
+  const iHeight0 = Math.sqrt(dist2dSq(
+    { x: lm0[8].x * cw, y: lm0[8].y * ch },
+    { x: lm0[0].x * cw, y: lm0[0].y * ch }
+  ));
+  const iHeight1 = Math.sqrt(dist2dSq(
+    { x: lm1[8].x * cw, y: lm1[8].y * ch },
+    { x: lm1[0].x * cw, y: lm1[0].y * ch }
+  ));
+  const H = Math.max(40, (iHeight0 + iHeight1) * 0.5);
+  const W = Math.max(40, abLen - palmSize * 0.6);
+
   const Cx = (A.x + B.x) * 0.5;
   const Cy = (A.y + B.y) * 0.5;
-  let theta = Math.atan2(uy, ux);
-  while (theta < -Math.PI / 2) theta += Math.PI;
-  while (theta > Math.PI / 2) theta -= Math.PI;
-  const cosT = Math.cos(theta);
-  const sinT = Math.sin(theta);
-  const u_norm_x = cosT, u_norm_y = sinT;
-  const v_norm_x = -sinT, v_norm_y = cosT;
+
+  const theta = Math.atan2(uy, ux);
   const hw = W * 0.5;
   const hh = H * 0.5;
   return {
@@ -292,10 +299,10 @@ function calcRect(cw, ch, hands) {
     theta,
     h1: A,
     h3: B,
-    c1: { x: Cx - hw * u_norm_x - hh * v_norm_x, y: Cy - hw * u_norm_y - hh * v_norm_y },
-    c2: { x: Cx + hw * u_norm_x - hh * v_norm_x, y: Cy + hw * u_norm_y - hh * v_norm_y },
-    c3: { x: Cx + hw * u_norm_x + hh * v_norm_x, y: Cy + hw * u_norm_y + hh * v_norm_y },
-    c4: { x: Cx - hw * u_norm_x + hh * v_norm_x, y: Cy - hw * u_norm_y + hh * v_norm_y }
+    c1: { x: Cx - hw * ux - hh * vx, y: Cy - hw * uy - hh * vy },
+    c2: { x: Cx + hw * ux - hh * vx, y: Cy + hw * uy - hh * vy },
+    c3: { x: Cx + hw * ux + hh * vx, y: Cy + hw * uy + hh * vy },
+    c4: { x: Cx - hw * ux + hh * vx, y: Cy - hw * uy + hh * vy }
   };
 }
 
@@ -1096,7 +1103,9 @@ function onHandResults(results) {
 
   state.wasFraming = state.isFraming;
 
-  if (state.isFraming && foldedHands.length > 0 && state.framingStableDuration >= 500) {
+  // Require BOTH hands clearly detected before allowing shutter
+  const bothHandsVisible = state.hands.length >= 2;
+  if (state.isFraming && bothHandsVisible && foldedHands.length > 0 && state.framingStableDuration >= 500) {
     const now = Date.now();
     if (now - state.lastSnapTime > 1500) {
       state.lastSnapTime = now;
@@ -1291,10 +1300,6 @@ function captureSnapshot() {
   const tc = temp.getContext('2d');
   
   tc.save();
-  if (state.isMirrorActive) {
-    tc.translate(w, 0);
-    tc.scale(-1, 1);
-  }
 
   if (state.smoothedRect) {
     const rect = state.smoothedRect;
@@ -1309,8 +1314,17 @@ function captureSnapshot() {
     const cropH = maxY - minY;
 
     if (cropW > 10 && cropH > 10) {
+      // Preserve aspect ratio: scale to fill canvas without stretching (cover)
+      const scaleX = w / cropW;
+      const scaleY = h / cropH;
+      const scale = Math.max(scaleX, scaleY);
+      const destW = cropW * scale;
+      const destH = cropH * scale;
+      const destX = (w - destW) / 2;
+      const destY = (h - destH) / 2;
+
       tc.filter = getThemeInsideFilter(1.0);
-      tc.drawImage(elements.webcam, minX, minY, cropW, cropH, 0, 0, w, h);
+      tc.drawImage(elements.webcam, minX, minY, cropW, cropH, destX, destY, destW, destH);
     } else {
       tc.drawImage(elements.webcam, 0, 0, w, h);
     }
