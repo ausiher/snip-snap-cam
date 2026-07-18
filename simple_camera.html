@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Simple Camera Stream</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      background: #000;
+    }
+    .controls-overlay {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      gap: 12px;
+    }
+    .btn {
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 10px 20px;
+      font-size: 0.9rem;
+      border-radius: 30px;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: background 0.2s;
+    }
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    .status-msg {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.8);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      color: #aaa;
+      pointer-events: none;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <!-- Top Control Buttons -->
+  <div class="controls-overlay">
+    <button id="btn-toggle-cam" class="btn">📷 START CAMERA</button>
+    <button id="btn-switch-cam" class="btn">🔄 SWITCH CAMERA</button>
+  </div>
+
+  <!-- Direct Camera Video Element -->
+  <video id="camera-feed" autoplay playsinline muted></video>
+
+  <!-- Status Message -->
+  <div id="status" class="status-msg">Click "START CAMERA" to view feed</div>
+
+  <script>
+    const videoEl = document.getElementById('camera-feed');
+    const btnToggle = document.getElementById('btn-toggle-cam');
+    const btnSwitch = document.getElementById('btn-switch-cam');
+    const statusEl = document.getElementById('status');
+
+    let currentStream = null;
+    let facingMode = 'user';
+
+    async function startCamera() {
+      if (currentStream) {
+        stopCamera();
+      }
+
+      statusEl.textContent = 'Requesting camera access...';
+      
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            facingMode: facingMode
+          },
+          audio: false
+        });
+
+        currentStream = stream;
+        videoEl.srcObject = stream;
+        await videoEl.play();
+
+        btnToggle.textContent = '🔴 STOP CAMERA';
+        statusEl.textContent = `Camera active (${facingMode} mode)`;
+      } catch (err) {
+        console.error('Camera error:', err);
+        statusEl.textContent = '⚠️ Error: ' + (err.message || 'Camera permission denied');
+      }
+    }
+
+    function stopCamera() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+        currentStream = null;
+      }
+      videoEl.srcObject = null;
+      btnToggle.textContent = '📷 START CAMERA';
+      statusEl.textContent = 'Camera stopped';
+    }
+
+    btnToggle.addEventListener('click', () => {
+      if (currentStream) {
+        stopCamera();
+      } else {
+        startCamera();
+      }
+    });
+
+    btnSwitch.addEventListener('click', () => {
+      facingMode = facingMode === 'user' ? 'environment' : 'user';
+      startCamera();
+    });
+
+    // Attempt automatic start on load if permission granted
+    window.addEventListener('DOMContentLoaded', () => {
+      startCamera();
+    });
+  </script>
+</body>
+</html>
