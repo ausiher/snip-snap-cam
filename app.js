@@ -25,7 +25,9 @@ const state = {
   popupOpen: false,
   popupClosing: false,
   rollOpen: false,
-  loopStarted: false
+  loopStarted: false,
+  framingStartTime: 0,
+  framingStableDuration: 0
 };
 
 // ─── 2. DOM Elements (Lazy Getters) ──────────────────────────────────
@@ -1073,17 +1075,33 @@ function onHandResults(results) {
   const lHands = state.hands.filter(h => h.isL);
   const foldedHands = state.hands.filter(h => h.isFolded);
   const wasFraming = state.isFraming;
-  state.isFraming = (lHands.length === 2) || (lHands.length === 1 && foldedHands.length === 1);
 
-  if (state.isFraming && !wasFraming) {
-    playFocusBeep();
+  const hasTwoL = (lHands.length === 2);
+  const hasOneLOneFolded = (lHands.length === 1 && foldedHands.length === 1);
+
+  if (hasTwoL) {
+    state.isFraming = true;
+    if (!wasFraming) {
+      state.framingStartTime = Date.now();
+      playFocusBeep();
+    }
+    state.framingStableDuration = Date.now() - state.framingStartTime;
+  } else if (state.isFraming && hasOneLOneFolded) {
+    state.isFraming = true;
+  } else {
+    state.isFraming = false;
+    state.framingStartTime = 0;
+    state.framingStableDuration = 0;
   }
+
   state.wasFraming = state.isFraming;
 
-  if (state.isFraming && foldedHands.length > 0) {
+  if (state.isFraming && foldedHands.length > 0 && state.framingStableDuration >= 500) {
     const now = Date.now();
-    if (now - state.lastSnapTime > 1200) {
+    if (now - state.lastSnapTime > 1500) {
       state.lastSnapTime = now;
+      state.framingStableDuration = 0;
+      state.framingStartTime = Date.now();
       captureSnapshot();
     }
   }
@@ -1103,7 +1121,7 @@ function updateSmoothedRect() {
     state.smoothedRect = { ...target };
     return;
   }
-  const alpha = 0.16;
+  const alpha = 0.06;
   const cur = state.smoothedRect;
   cur.center.x = lerp(cur.center.x, target.center.x, alpha);
   cur.center.y = lerp(cur.center.y, target.center.y, alpha);
@@ -1280,15 +1298,22 @@ function captureSnapshot() {
 
   if (state.smoothedRect) {
     const rect = state.smoothedRect;
-    tc.beginPath();
-    tc.moveTo(rect.c1.x, rect.c1.y);
-    tc.lineTo(rect.c2.x, rect.c2.y);
-    tc.lineTo(rect.c3.x, rect.c3.y);
-    tc.lineTo(rect.c4.x, rect.c4.y);
-    tc.closePath();
-    tc.clip();
-    tc.filter = getThemeInsideFilter(1.0);
-    tc.drawImage(elements.webcam, 0, 0, w, h);
+    const xs = [rect.c1.x, rect.c2.x, rect.c3.x, rect.c4.x];
+    const ys = [rect.c1.y, rect.c2.y, rect.c3.y, rect.c4.y];
+    const minX = Math.max(0, Math.min(...xs));
+    const maxX = Math.min(w, Math.max(...xs));
+    const minY = Math.max(0, Math.min(...ys));
+    const maxY = Math.min(h, Math.max(...ys));
+
+    const cropW = maxX - minX;
+    const cropH = maxY - minY;
+
+    if (cropW > 10 && cropH > 10) {
+      tc.filter = getThemeInsideFilter(1.0);
+      tc.drawImage(elements.webcam, minX, minY, cropW, cropH, 0, 0, w, h);
+    } else {
+      tc.drawImage(elements.webcam, 0, 0, w, h);
+    }
   } else {
     tc.drawImage(elements.webcam, 0, 0, w, h);
   }
