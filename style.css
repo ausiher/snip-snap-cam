@@ -302,11 +302,28 @@ body.theme-sage {
   overflow: hidden;
 }
 
-#viewfinder-canvas {
+#webcam {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  z-index: 1;
+  display: block;
   background: #000;
+}
+
+#viewfinder-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 2;
+  pointer-events: none;
+  background: transparent;
 }
 
 /* HUD Overlay on Viewfinder */

@@ -20,9 +20,9 @@
     <!-- Viewfinder (Full Screen) -->
     <main class="viewfinder-section">
       <div class="canvas-wrapper">
-        <!-- Hidden source video stream -->
-        <video id="webcam" autoplay playsinline muted style="position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none;"></video>
-        <!-- The rendering canvas -->
+        <!-- Direct live camera video stream layer -->
+        <video id="webcam" autoplay playsinline muted></video>
+        <!-- The rendering overlay canvas -->
         <canvas id="viewfinder-canvas"></canvas>
         
         <!-- Retro Viewfinder Grid & HUD Layer -->
@@ -220,6 +220,6 @@
   </div>
 
   <!-- Scripts -->
-  <script type="module" src="app.js"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
