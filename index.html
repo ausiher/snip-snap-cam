@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SNIP SNAP! // Gesture Retro Film Camera</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- MediaPipe CDNs -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Onboarding / Permissions Overlay -->
+  <div id="onboarding" class="overlay onboarding-active">
+    <div class="onboarding-card">
+      <div class="camera-lens-logo">
+        <div class="lens-shutter"></div>
+        <div class="lens-reflection"></div>
+      </div>
+      <h1 class="glitch-text">SNIP SNAP!</h1>
+      <p class="subtitle">RETROGESTURE CAMERA SYSTEM</p>
+      
+      <div class="instructions-list">
+        <div class="instruction-item">
+          <div class="icon-wrap"><i data-lucide="hand"></i></div>
+          <div class="text-wrap">
+            <h3>1. Dual "L" Frame Gesture</h3>
+            <p>Form an "L" shape with the index finger and thumb of <strong>both hands</strong>. A glowing, dynamic frame will form between them, with the rest of the feed dropping to classic monochrome.</p>
+          </div>
+        </div>
+        <div class="instruction-item">
+          <div class="icon-wrap"><i data-lucide="scan"></i></div>
+          <div class="text-wrap">
+            <h3>2. Move & Rotate</h3>
+            <p>Move your hands closer or further to resize the frame. Tilt your hands to rotate the frame to match your perspective.</p>
+          </div>
+        </div>
+        <div class="instruction-item">
+          <div class="icon-wrap"><i data-lucide="camera"></i></div>
+          <div class="text-wrap">
+            <h3>3. Index Fold to Snap</h3>
+            <p>While holding the frame, quickly <strong>fold your index finger</strong> on <strong>either hand</strong> (like pulling a trigger) and release to snap a photo inside the frame. It will instantly align and save to the film roll.</p>
+          </div>
+        </div>
+      </div>
+
+      <button id="btn-start" class="btn btn-primary">
+        <i data-lucide="video"></i> INITIALIZE SYSTEM
+      </button>
+      <div class="perm-disclaimer">Requires webcam access. Hand detection is computed locally on-device.</div>
+    </div>
+  </div>
+
+  <!-- Main Application Container -->
+  <div class="app-container">
+    <!-- Left Panel: Viewfinder -->
+    <main class="viewfinder-section">
+      <header class="camera-header">
+        <div class="brand">
+          <span class="logo-red-dot"></span>
+          <h2>SNIP SNAP!</h2>
+          <span class="model-badge">M-1</span>
+        </div>
+        <div class="theme-selector">
+          <span class="selector-label">PROFILE</span>
+          <div class="selector-options">
+            <button class="theme-btn active" data-theme="classic">CLASSIC</button>
+            <button class="theme-btn" data-theme="neon">NEON</button>
+            <button class="theme-btn" data-theme="sage">SAGE</button>
+          </div>
+        </div>
+      </header>
+
+      <div class="canvas-wrapper">
+        <!-- Hidden source video stream -->
+        <video id="webcam" autoplay playsinline muted style="position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none;"></video>
+        <!-- The rendering canvas -->
+        <canvas id="viewfinder-canvas"></canvas>
+        
+        <!-- Retro Viewfinder Grid & HUD Layer -->
+        <div class="hud-overlay">
+          <!-- Crosshairs -->
+          <div class="center-crosshair"></div>
+
+          <!-- Bottom Telemetry / Instructions overlay -->
+          <div class="hud-bottom">
+            <div class="gesture-guide" id="gesture-guide-text">
+              <i data-lucide="info" class="guide-icon pulse"></i>
+              <span class="guide-msg">Raise two hands and make L-shapes to activate the focus frame</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Camera Shutter Flash Overlay -->
+        <div id="shutter-flash" class="shutter-flash"></div>
+      </div>
+
+      <footer class="camera-footer">
+        <div class="control-row">
+          <button id="btn-toggle-hud" class="btn btn-icon" title="Toggle HUD Overlay">
+            <i data-lucide="eye"></i> <span>HUD</span>
+          </button>
+          <button id="btn-toggle-landmarks" class="btn btn-icon" title="Toggle Tracking Dots">
+            <i data-lucide="circle-dot"></i> <span>TRACKING</span>
+          </button>
+          <button id="btn-toggle-mirror" class="btn btn-icon" title="Mirror Camera Feed">
+            <i data-lucide="refresh-cw"></i> <span>MIRROR</span>
+          </button>
+        </div>
+      </footer>
+    </main>
+
+    <!-- Right Panel: Film Strip Ribbon -->
+    <aside class="film-ribbon-section">
+
+
+      <div class="ribbon-header">
+        <h3>FILM ROLL</h3>
+        <span class="count-badge" id="photo-count">00/36</span>
+      </div>
+      <div class="sprocket-track-left"></div>
+      
+      <!-- Film frames list -->
+      <div class="film-strip" id="film-strip">
+        <!-- Film frames will be populated here -->
+        <div class="film-strip-placeholder" id="film-placeholder">
+          <i data-lucide="film"></i>
+          <p>No snapshots yet</p>
+          <span>Use L gesture to frame and fold index to capture!</span>
+        </div>
+      </div>
+      
+      <div class="sprocket-track-right"></div>
+      <div class="ribbon-footer" style="display: flex; flex-direction: column; gap: 8px; padding: 12px 16px;">
+        <button id="btn-collage" class="btn btn-primary" style="width: 100%; justify-content: center; font-weight: 700; letter-spacing: 0.05em;" disabled>
+          <i data-lucide="grid"></i> CREATE COLLAGE
+        </button>
+        <button id="btn-clear-film" class="btn btn-danger" style="width: 100%; justify-content: center;" disabled>
+          <i data-lucide="trash-2"></i> CLEAR ROLL
+        </button>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Polaroid Printed Sheet Modal -->
+  <div id="polaroid-modal" class="overlay polaroid-modal-hidden">
+    <div class="polaroid-backdrop"></div>
+    <div class="polaroid-wrapper">
+      <div class="polaroid-card" id="polaroid-card">
+        <div class="polaroid-photo-container">
+          <img id="polaroid-img" src="" alt="Polaroid Snapshot">
+          <div class="polaroid-overlay-gloss"></div>
+        </div>
+        <div class="polaroid-footer">
+          <textarea id="polaroid-caption" rows="2" placeholder="Write a memory..."></textarea>
+          <div class="polaroid-meta">
+            <span class="date" id="polaroid-date">JUN 30, 2026</span>
+            <span class="time" id="polaroid-time">21:42</span>
+          </div>
+        </div>
+      </div>
+      <div class="polaroid-actions">
+        <div class="share-dropdown-container">
+          <button id="btn-polaroid-share" class="btn btn-action">
+            <i data-lucide="share-2"></i> SHARE PHOTO
+          </button>
+          <div class="share-dropdown-menu hidden" id="polaroid-share-menu">
+            <button class="share-opt" data-action="download">
+              <i data-lucide="download"></i> Download Image
+            </button>
+            <button class="share-opt" data-action="copy">
+              <i data-lucide="copy"></i> Copy to Clipboard
+            </button>
+          </div>
+        </div>
+        <button id="btn-polaroid-close" class="btn btn-secondary">
+          <i data-lucide="x"></i> CLOSE
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collage Maker Modal -->
+  <div id="collage-modal" class="overlay collage-modal-hidden">
+    <div class="collage-backdrop"></div>
+    <div class="collage-wrapper">
+      <div class="collage-sidebar">
+        <h2>COLLAGE SHEET</h2>
+        <p class="sidebar-help">Select a template layout to compile your film roll negatives.</p>
+        
+        <div class="layout-selector">
+          <label>LAYOUT PATTERN</label>
+          <div class="layout-options">
+            <button class="layout-btn active" data-layout="grid">2x2 GRID</button>
+            <button class="layout-btn" data-layout="strip">35mm STRIP</button>
+            <button class="layout-btn" data-layout="contact">CONTACT SHEET</button>
+          </div>
+        </div>
+        
+        <div class="collage-meta-input">
+          <label>MEMO / TITLE</label>
+          <input type="text" id="collage-title-input" value="SNIP SNAP! Memory Sheet">
+        </div>
+        
+        <div class="collage-actions">
+          <div class="share-dropdown-container">
+            <button id="btn-collage-share" class="btn btn-primary" style="width: 100%; justify-content: center; gap: 8px;">
+              <i data-lucide="share-2"></i> SHARE COLLAGE
+            </button>
+            <div class="share-dropdown-menu hidden" id="collage-share-menu">
+              <button class="share-opt" data-action="download">
+                <i data-lucide="download"></i> Download Image
+              </button>
+              <button class="share-opt" data-action="copy">
+                <i data-lucide="copy"></i> Copy to Clipboard
+              </button>
+            </div>
+          </div>
+          <button id="btn-collage-close" class="btn btn-secondary" style="width: 100%; justify-content: center;">
+            <i data-lucide="x"></i> CLOSE
+          </button>
+        </div>
+      </div>
+      <div class="collage-preview-panel">
+        <div class="collage-canvas-container">
+          <canvas id="collage-preview-canvas"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Batch 4 Snapshot Popup Modal -->
+  <div id="snapshot-popup" class="overlay popup-hidden">
+    <div class="popup-backdrop"></div>
+    <div class="popup-wrapper">
+      <div class="popup-card">
+        <h2 class="popup-title">BATCH REVIEW 🎞️</h2>
+        <p class="popup-subtitle">Reviewing your 4 latest negatives</p>
+        
+        <div class="popup-grid" id="popup-grid">
+          <!-- Populated dynamically via JS -->
+        </div>
+        
+        <div class="popup-guide">
+          <div class="thumb-icon-wrapper">
+            <i data-lucide="thumbs-up" class="thumb-icon pulse"></i>
+          </div>
+          <p class="guide-text">Perform a <strong>Thumbs Up</strong> gesture to resume shooting</p>
+        </div>
+        
+        <button id="btn-popup-close" class="btn btn-secondary">
+          <i data-lucide="x"></i> CLOSE MANUALLY
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
