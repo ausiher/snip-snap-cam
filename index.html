@@ -24,25 +24,14 @@
         <video id="webcam" autoplay playsinline muted style="position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none;"></video>
         <!-- The rendering canvas -->
         <canvas id="viewfinder-canvas"></canvas>
-
-        <!-- Interactive Camera Permission Request Overlay -->
-        <div id="camera-permission-overlay" class="camera-permission-overlay hidden">
-          <div class="permission-card">
-            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ffb000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
-            <h2>CAMERA PERMISSION REQUIRED</h2>
-            <p>SNIP SNAP! needs access to your camera to detect hand gestures and capture 35mm retro snapshots.</p>
-            <button id="btn-enable-camera" class="btn btn-primary btn-lg">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
-              ENABLE CAMERA
-            </button>
-            <p id="camera-status-msg" class="status-msg"></p>
-          </div>
-        </div>
         
         <!-- Retro Viewfinder Grid & HUD Layer -->
         <div class="hud-overlay">
-          <!-- Floating Help Info Tooltip (Top Left) -->
+          <!-- Floating Help Info Tooltip & Camera Control (Top Left) -->
           <div class="hud-info-floating">
+            <button id="btn-camera-toggle" class="btn-control-floating camera-btn-off" title="Enable / Disable Camera">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+            </button>
             <button id="btn-toggle-info" class="btn-control-floating" title="Show Help Instructions">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             </button>

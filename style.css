@@ -1763,7 +1763,7 @@ body.theme-sage {
   }
 }
 
-/* Floating Info Tooltip (Top Left) */
+/* Floating Info Tooltip & Camera Control (Top Left) */
 .hud-info-floating {
   position: absolute;
   top: 20px;
@@ -1773,6 +1773,19 @@ body.theme-sage {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* Camera Toggle Status Button Outlines */
+.btn-control-floating.camera-btn-off {
+  border: 2px solid #ff4444 !important;
+  color: #ff4444 !important;
+  box-shadow: 0 0 12px rgba(255, 68, 68, 0.4) !important;
+}
+
+.btn-control-floating.camera-btn-on {
+  border: 2px solid #00ffd2 !important;
+  color: #00ffd2 !important;
+  box-shadow: 0 0 12px rgba(0, 255, 210, 0.4) !important;
 }
 
 .info-tooltip-box {

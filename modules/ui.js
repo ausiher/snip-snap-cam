@@ -32,7 +32,8 @@ export const elements = {
   btnRollBadge: document.getElementById('btn-roll-badge'),
   floatingRollTray: document.getElementById('floating-roll-tray'),
   
-  // Floating help tooltip
+  // Floating help tooltip & camera control
+  btnCameraToggle: document.getElementById('btn-camera-toggle'),
   btnToggleInfo: document.getElementById('btn-toggle-info'),
   infoTooltip: document.getElementById('info-tooltip'),
 
@@ -286,6 +287,7 @@ export function initUI() {
     btnToggleRoll: document.getElementById('btn-toggle-roll'),
     btnRollBadge: document.getElementById('btn-roll-badge'),
     floatingRollTray: document.getElementById('floating-roll-tray'),
+    btnCameraToggle: document.getElementById('btn-camera-toggle'),
     btnToggleInfo: document.getElementById('btn-toggle-info'),
     infoTooltip: document.getElementById('info-tooltip'),
     btnCollage: document.getElementById('btn-collage'),
@@ -400,17 +402,14 @@ export function initUI() {
     });
   }
 
-  // Floating Info Tooltip bindings
   const btnInfo = document.getElementById('btn-toggle-info');
   const infoTooltip = document.getElementById('info-tooltip');
   if (btnInfo && infoTooltip) {
-    btnInfo.addEventListener('click', (e) => {
+    btnInfo.onclick = (e) => {
       e.stopPropagation();
-      e.preventDefault();
-      const isHidden = infoTooltip.classList.contains('hidden');
-      infoTooltip.classList.toggle('hidden', !isHidden);
-      btnInfo.classList.toggle('active', isHidden);
-    });
+      infoTooltip.classList.toggle('hidden');
+      btnInfo.classList.toggle('active');
+    };
 
     document.addEventListener('click', (e) => {
       if (!infoTooltip.classList.contains('hidden')) {

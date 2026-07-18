@@ -45,83 +45,81 @@ function getThemeOuterOverlay(progress) {
   }
 }
 
-// ─── Startup & Camera Permission Handling ────────────────────────────
-async function startSystem() {
-  const permOverlay = document.getElementById('camera-permission-overlay');
-  const statusMsg = document.getElementById('camera-status-msg');
+let currentStream = null;
 
-  // Check for insecure context (e.g. file:// protocol without http/https server)
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    if (permOverlay) permOverlay.classList.remove('hidden');
-    if (statusMsg) {
-      statusMsg.style.color = '#ff4444';
-      statusMsg.innerHTML = '⚠️ <strong>Local file:// context detected!</strong><br>Browsers block camera access on <code>file://</code>.<br>Run via local server (e.g. <code>http://localhost:8080</code>) or Cloudflare Pages.';
-    }
-    return;
+function updateCameraToggleUI(active) {
+  const btn = elements.btnCameraToggle || document.getElementById('btn-camera-toggle');
+  if (!btn) return;
+  if (active) {
+    btn.classList.remove('camera-btn-off');
+    btn.classList.add('camera-btn-on');
+    btn.title = "Camera Active — Click to Disable";
+  } else {
+    btn.classList.remove('camera-btn-on');
+    btn.classList.add('camera-btn-off');
+    btn.title = "Camera Disabled — Click to Enable";
   }
+}
 
-  // Draw loading state on canvas
+function stopSystem() {
+  if (currentStream) {
+    currentStream.getTracks().forEach(track => track.stop());
+    currentStream = null;
+  }
+  elements.webcam.srcObject = null;
+  state.systemInitialized = false;
+
   const loadCtx = elements.canvas.getContext('2d');
   elements.canvas.width = window.innerWidth;
   elements.canvas.height = window.innerHeight;
   loadCtx.fillStyle = '#000';
   loadCtx.fillRect(0, 0, elements.canvas.width, elements.canvas.height);
-  loadCtx.fillStyle = 'rgba(255,255,255,0.7)';
+  loadCtx.fillStyle = 'rgba(255, 68, 68, 0.8)';
   loadCtx.font = '14px "Space Grotesk", sans-serif';
   loadCtx.textAlign = 'center';
-  loadCtx.fillText('Starting camera…', elements.canvas.width / 2, elements.canvas.height / 2);
+  loadCtx.fillText('Camera Disabled', elements.canvas.width / 2, elements.canvas.height / 2);
 
-  // Camera constraint sets to try in order
-  const constraintsList = [
-    { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }, audio: false },
-    { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'environment' }, audio: false },
-    { video: true, audio: false }
-  ];
+  updateCameraToggleUI(false);
+}
 
-  let stream = null;
-  for (const constraints of constraintsList) {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
-      break;
-    } catch (e) {
-      console.warn('Camera attempt failed:', constraints, e);
+// ─── Startup & Camera Permission Handling ────────────────────────────
+async function startSystem() {
+  if (state.systemInitialized && currentStream) return;
+
+  try {
+    updateCameraToggleUI('loading');
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    });
+
+    currentStream = stream;
+    elements.webcam.srcObject = stream;
+    elements.webcam.setAttribute('playsinline', '');
+    elements.webcam.setAttribute('muted', '');
+    elements.webcam.muted = true;
+
+    await elements.webcam.play();
+
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    
+    if (!handsDetector) {
+      initMediaPipe();
     }
-  }
 
-  if (!stream) {
-    // Show camera permission overlay so user can click to trigger permission prompt
-    if (permOverlay) permOverlay.classList.remove('hidden');
-    if (statusMsg) {
-      statusMsg.style.color = '#ffb000';
-      statusMsg.textContent = 'Camera permission required. Click "ENABLE CAMERA" above to allow access.';
+    state.systemInitialized = true;
+    updateCameraToggleUI(true);
+
+    if (!state.loopStarted) {
+      state.loopStarted = true;
+      requestAnimationFrame(mainLoop);
     }
-    return;
+  } catch (err) {
+    console.error('Camera startup error:', err);
+    updateCameraToggleUI(false);
   }
-
-  // Success — hide permission request overlay
-  if (permOverlay) permOverlay.classList.add('hidden');
-
-  elements.webcam.srcObject = stream;
-  elements.webcam.setAttribute('playsinline', '');
-  elements.webcam.setAttribute('muted', '');
-  elements.webcam.muted = true;
-
-  await new Promise((resolve) => {
-    const onReady = () => {
-      elements.webcam.removeEventListener('loadedmetadata', onReady);
-      resolve();
-    };
-    elements.webcam.addEventListener('loadedmetadata', onReady);
-    setTimeout(resolve, 5000);
-  });
-
-  try { await elements.webcam.play(); } catch (_) {}
-
-  resizeCanvas();
-  window.addEventListener('resize', resizeCanvas);
-  initMediaPipe();
-  state.systemInitialized = true;
-  requestAnimationFrame(mainLoop);
 }
 
 function resizeCanvas() {
@@ -156,7 +154,7 @@ function mainLoop() {
   if (state.systemInitialized) {
     frameCount++;
 
-    if (frameCount % DETECT_EVERY === 0 && !mpBusy && elements.webcam.videoWidth > 0 && elements.webcam.readyState >= 3) {
+    if (frameCount % DETECT_EVERY === 0 && !mpBusy && elements.webcam.videoWidth > 0) {
       mpBusy = true;
       if (handsDetector) {
         handsDetector.send({ image: elements.webcam }).then(() => {
@@ -525,6 +523,17 @@ function boot() {
   if (btnEnableCam) {
     btnEnableCam.addEventListener('click', () => {
       startSystem();
+    });
+  }
+
+  const btnCamToggle = elements.btnCameraToggle || document.getElementById('btn-camera-toggle');
+  if (btnCamToggle) {
+    btnCamToggle.addEventListener('click', () => {
+      if (state.systemInitialized && currentStream) {
+        stopSystem();
+      } else {
+        startSystem();
+      }
     });
   }
 
