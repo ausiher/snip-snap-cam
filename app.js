@@ -253,43 +253,62 @@ function calcRect(cw, ch, hands) {
   const B = getLCorner(activeHands[1].landmarks, cw, ch);
   if (!A || !B) return null;
 
-  // Use A→B vector as the primary horizontal axis — stable, no 180° flips
-  const abDx = B.x - A.x;
-  const abDy = B.y - A.y;
-  const abLen = Math.sqrt(abDx * abDx + abDy * abDy);
-  if (abLen < 10) return null;
-
-  // Horizontal axis along A→B
-  const ux = abDx / abLen;
-  const uy = abDy / abLen;
-
-  // Vertical axis: perpendicular to A→B, biased upward (negative Y in screen space)
-  let vx = -uy, vy = ux;
-  if (vy > 0) { vx = uy; vy = -ux; } // always point upward
-
-  // Measure frame size based on index-finger span of each hand
   const lm0 = activeHands[0].landmarks;
   const lm1 = activeHands[1].landmarks;
+
+  // Index finger direction for each hand: wrist → index tip
+  const i0x = lm0[8].x * cw - lm0[0].x * cw;
+  const i0y = lm0[8].y * ch - lm0[0].y * ch;
+  const i1x = lm1[8].x * cw - lm1[0].x * cw;
+  const i1y = lm1[8].y * ch - lm1[0].y * ch;
+  const len0 = Math.sqrt(i0x*i0x + i0y*i0y);
+  const len1 = Math.sqrt(i1x*i1x + i1y*i1y);
+  if (len0 < 5 || len1 < 5) return null;
+
+  // Normalize each direction
+  const n0x = i0x / len0, n0y = i0y / len0;
+  let n1x = i1x / len1, n1y = i1y / len1;
+
+  // Align n1 to n0 to avoid cancellation when hands face different ways
+  if (n0x * n1x + n0y * n1y < 0) { n1x = -n1x; n1y = -n1y; }
+
+  // Average index direction = "up" axis of the viewfinder frame
+  let upX = n0x + n1x;
+  let upY = n0y + n1y;
+  const upLen = Math.sqrt(upX*upX + upY*upY);
+  if (upLen < 0.01) return null;
+  upX /= upLen; upY /= upLen;
+
+  // Ensure "up" axis always points upward on screen (negative Y)
+  if (upY > 0) { upX = -upX; upY = -upY; }
+
+  // Perpendicular = horizontal axis of the frame (rightward)
+  // Two options: (-upY, upX) or (upY, -upX)
+  // Pick the one whose dot product with thumb-of-hand0 is positive (inside the L)
+  let hzX = -upY, hzY = upX;
+  const thb0x = lm0[4].x * cw - A.x;
+  const thb0y = lm0[4].y * ch - A.y;
+  if (hzX * thb0x + hzY * thb0y < 0) { hzX = -hzX; hzY = -hzY; }
+
+  // Frame dimensions:
+  // Width  = A→B projected onto horizontal axis, minus palm margins
+  // Height = average index-tip-to-wrist length
   const p0 = { x: lm0[0].x * cw, y: lm0[0].y * ch };
   const p9 = { x: lm0[9].x * cw, y: lm0[9].y * ch };
   const palmSize = Math.sqrt(dist2dSq(p0, p9));
+  const margin = palmSize * 0.38;
 
-  // Height: average index-tip to wrist distance across both hands
-  const iHeight0 = Math.sqrt(dist2dSq(
-    { x: lm0[8].x * cw, y: lm0[8].y * ch },
-    { x: lm0[0].x * cw, y: lm0[0].y * ch }
-  ));
-  const iHeight1 = Math.sqrt(dist2dSq(
-    { x: lm1[8].x * cw, y: lm1[8].y * ch },
-    { x: lm1[0].x * cw, y: lm1[0].y * ch }
-  ));
-  const H = Math.max(40, (iHeight0 + iHeight1) * 0.5);
-  const W = Math.max(40, abLen - palmSize * 0.6);
+  const abX = B.x - A.x, abY = B.y - A.y;
+  const projW = Math.abs(abX * hzX + abY * hzY);
+  const W = Math.max(40, projW - margin * 2);
+  const H = Math.max(40, (len0 + len1) * 0.5 - palmSize * 0.2);
 
   const Cx = (A.x + B.x) * 0.5;
   const Cy = (A.y + B.y) * 0.5;
 
-  const theta = Math.atan2(uy, ux);
+  // theta = angle of horizontal axis — used for smoothed lerp
+  const theta = Math.atan2(hzY, hzX);
+
   const hw = W * 0.5;
   const hh = H * 0.5;
   return {
@@ -299,10 +318,10 @@ function calcRect(cw, ch, hands) {
     theta,
     h1: A,
     h3: B,
-    c1: { x: Cx - hw * ux - hh * vx, y: Cy - hw * uy - hh * vy },
-    c2: { x: Cx + hw * ux - hh * vx, y: Cy + hw * uy - hh * vy },
-    c3: { x: Cx + hw * ux + hh * vx, y: Cy + hw * uy + hh * vy },
-    c4: { x: Cx - hw * ux + hh * vx, y: Cy - hw * uy + hh * vy }
+    c1: { x: Cx - hw * hzX - hh * upX, y: Cy - hw * hzY - hh * upY },
+    c2: { x: Cx + hw * hzX - hh * upX, y: Cy + hw * hzY - hh * upY },
+    c3: { x: Cx + hw * hzX + hh * upX, y: Cy + hw * hzY + hh * upY },
+    c4: { x: Cx - hw * hzX + hh * upX, y: Cy - hw * hzY + hh * upY }
   };
 }
 
@@ -1123,30 +1142,40 @@ function updateSmoothedRect() {
   }
   const target = calcRect(elements.canvas.width, elements.canvas.height, state.hands);
   if (!target) {
-    state.smoothedRect = null;
+    // Don't immediately null out — hold last valid frame briefly
     return;
   }
   if (!state.smoothedRect) {
     state.smoothedRect = { ...target };
     return;
   }
-  const alpha = 0.06;
+
+  const alphaSlow = 0.05;  // position/size
+  const alphaAngle = 0.04; // angle is smoothed more aggressively
   const cur = state.smoothedRect;
-  cur.center.x = lerp(cur.center.x, target.center.x, alpha);
-  cur.center.y = lerp(cur.center.y, target.center.y, alpha);
-  cur.width = lerp(cur.width, target.width, alpha);
-  cur.height = lerp(cur.height, target.height, alpha);
-  cur.theta = lerpAngle(cur.theta, target.theta, alpha);
+
+  cur.center.x = lerp(cur.center.x, target.center.x, alphaSlow);
+  cur.center.y = lerp(cur.center.y, target.center.y, alphaSlow);
+  cur.width    = lerp(cur.width,    target.width,    alphaSlow);
+  cur.height   = lerp(cur.height,   target.height,   alphaSlow);
+
+  // Anti-flip: if target theta differs from current by >90°, offset by ±π to pick nearer direction
+  let targetTheta = target.theta;
+  let diff = targetTheta - cur.theta;
+  while (diff >  Math.PI / 2) { targetTheta -= Math.PI; diff = targetTheta - cur.theta; }
+  while (diff < -Math.PI / 2) { targetTheta += Math.PI; diff = targetTheta - cur.theta; }
+  cur.theta = cur.theta + diff * alphaAngle;
 
   const cosT = Math.cos(cur.theta), sinT = Math.sin(cur.theta);
-  const ux = cosT, uy = sinT;
-  const vx = -sinT, vy = cosT;
   const hw = cur.width * 0.5;
   const hh = cur.height * 0.5;
-  cur.c1 = { x: cur.center.x - hw * ux - hh * vx, y: cur.center.y - hw * uy - hh * vy };
-  cur.c2 = { x: cur.center.x + hw * ux - hh * vx, y: cur.center.y + hw * uy - hh * vy };
-  cur.c3 = { x: cur.center.x + hw * ux + hh * vx, y: cur.center.y + hw * uy + hh * vy };
-  cur.c4 = { x: cur.center.x - hw * ux + hh * vx, y: cur.center.y - hw * uy + hh * vy };
+  // hzX/hzY = horizontal axis, upX/upY = vertical axis
+  const hzX = cosT, hzY = sinT;
+  const upX = -sinT, upY = cosT;
+  cur.c1 = { x: cur.center.x - hw * hzX - hh * upX, y: cur.center.y - hw * hzY - hh * upY };
+  cur.c2 = { x: cur.center.x + hw * hzX - hh * upX, y: cur.center.y + hw * hzY - hh * upY };
+  cur.c3 = { x: cur.center.x + hw * hzX + hh * upX, y: cur.center.y + hw * hzY + hh * upY };
+  cur.c4 = { x: cur.center.x - hw * hzX + hh * upX, y: cur.center.y - hw * hzY + hh * upY };
   cur.h1 = target.h1;
   cur.h3 = target.h3;
 }
