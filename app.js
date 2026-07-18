@@ -61,7 +61,6 @@ async function startSystem() {
       state.systemInitialized = true;
       requestAnimationFrame(mainLoop);
     });
-    elements.onboarding.style.display = 'none';
   } catch (err) {
     console.error('Camera error:', err);
     alert('Camera access required. Please grant permissions and refresh.');

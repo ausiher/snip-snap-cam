@@ -1703,3 +1703,62 @@ body.theme-sage {
   }
 }
 
+/* Floating Info Tooltip (Top Left) */
+.hud-info-floating {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 30;
+  pointer-events: auto; /* Allow clicks */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-tooltip-box {
+  background: rgba(25, 25, 30, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--border-radius-md);
+  padding: 16px;
+  width: 240px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  backdrop-filter: blur(12px);
+  color: var(--ink-secondary);
+  font-family: var(--font-sans);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  transform-origin: top left;
+}
+
+.info-tooltip-box.hidden {
+  display: none;
+}
+
+.info-tooltip-box h3 {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--theme-accent, var(--accent-amber));
+  margin-bottom: 10px;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 6px;
+}
+
+.info-tooltip-box ul {
+  padding-left: 0;
+  list-style: none;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-tooltip-box li {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.info-tooltip-box strong {
+  color: var(--ink-primary);
+}
+

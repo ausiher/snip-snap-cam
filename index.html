@@ -17,47 +17,6 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Onboarding / Permissions Overlay -->
-  <div id="onboarding" class="overlay onboarding-active">
-    <div class="onboarding-card">
-      <div class="camera-lens-logo">
-        <div class="lens-shutter"></div>
-        <div class="lens-reflection"></div>
-      </div>
-      <h1 class="glitch-text">SNIP SNAP!</h1>
-      <p class="subtitle">RETROGESTURE CAMERA SYSTEM</p>
-      
-      <div class="instructions-list">
-        <div class="instruction-item">
-          <div class="icon-wrap"><i data-lucide="hand"></i></div>
-          <div class="text-wrap">
-            <h3>1. Dual "L" Frame Gesture</h3>
-            <p>Form an "L" shape with the index finger and thumb of <strong>both hands</strong>. A glowing, dynamic frame will form between them, with the rest of the feed dropping to classic monochrome.</p>
-          </div>
-        </div>
-        <div class="instruction-item">
-          <div class="icon-wrap"><i data-lucide="scan"></i></div>
-          <div class="text-wrap">
-            <h3>2. Move & Rotate</h3>
-            <p>Move your hands closer or further to resize the frame. Tilt your hands to rotate the frame to match your perspective.</p>
-          </div>
-        </div>
-        <div class="instruction-item">
-          <div class="icon-wrap"><i data-lucide="camera"></i></div>
-          <div class="text-wrap">
-            <h3>3. Index Fold to Snap</h3>
-            <p>While holding the frame, quickly <strong>fold your index finger</strong> on <strong>either hand</strong> (like pulling a trigger) and release to snap a photo inside the frame. It will instantly align and save to the film roll.</p>
-          </div>
-        </div>
-      </div>
-
-      <button id="btn-start" class="btn btn-primary">
-        <i data-lucide="video"></i> INITIALIZE SYSTEM
-      </button>
-      <div class="perm-disclaimer">Requires webcam access. Hand detection is computed locally on-device.</div>
-    </div>
-  </div>
-
   <!-- Main Application Container -->
   <div class="app-container">
     <!-- Left Panel: Viewfinder (Now covers entire page) -->
@@ -70,6 +29,21 @@
         
         <!-- Retro Viewfinder Grid & HUD Layer -->
         <div class="hud-overlay">
+          <!-- Floating Help Info Tooltip (Top Left) -->
+          <div class="hud-info-floating">
+            <button id="btn-toggle-info" class="btn-control-floating" title="Show Help Instructions">
+              <i data-lucide="help-circle"></i>
+            </button>
+            <div id="info-tooltip" class="info-tooltip-box hidden">
+              <h3>HOW TO USE 📸</h3>
+              <ul>
+                <li><strong>Frame:</strong> Make "L" shapes with both hands.</li>
+                <li><strong>Snap:</strong> Fold index finger like a trigger.</li>
+                <li><strong>Close:</strong> Show a Thumbs Up gesture.</li>
+              </ul>
+            </div>
+          </div>
+
           <!-- Floating Controls (Top Right) -->
           <div class="hud-controls-floating">
             <button id="btn-toggle-hud" class="btn-control-floating" title="Toggle HUD Overlay">

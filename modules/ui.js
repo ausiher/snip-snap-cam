@@ -6,7 +6,6 @@ import { playTickSound, playConfirmBeep } from './audio.js';
 import { THEME_CONFIGS, renderCollage } from './collage.js';
 
 export const elements = {
-  onboarding: document.getElementById('onboarding'),
   webcam: document.getElementById('webcam'),
   canvas: document.getElementById('viewfinder-canvas'),
   hudOverlay: document.querySelector('.hud-overlay'),
@@ -33,6 +32,10 @@ export const elements = {
   btnToggleRoll: document.getElementById('btn-toggle-roll'),
   btnRollBadge: document.getElementById('btn-roll-badge'),
   floatingRollTray: document.getElementById('floating-roll-tray'),
+  
+  // Floating help tooltip
+  btnToggleInfo: document.getElementById('btn-toggle-info'),
+  infoTooltip: document.getElementById('info-tooltip'),
 
   // Collage controls
   btnCollage: document.getElementById('btn-collage'),
@@ -359,6 +362,24 @@ export function initUI() {
       const tempCanvas = document.createElement('canvas');
       await renderCollage(tempCanvas, latestPhotos, 'SNIP SNAP! BATCH', state.activeTheme, 'grid');
       downloadCanvas(tempCanvas, `snipsnap_batch_${Date.now()}.jpg`);
+    });
+  }
+
+  // Floating Info Tooltip bindings
+  if (elements.btnToggleInfo && elements.infoTooltip) {
+    elements.btnToggleInfo.addEventListener('click', (e) => {
+      e.stopPropagation();
+      elements.infoTooltip.classList.toggle('hidden');
+      elements.btnToggleInfo.classList.toggle('active');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!elements.infoTooltip.classList.contains('hidden')) {
+        if (!elements.infoTooltip.contains(e.target) && e.target !== elements.btnToggleInfo) {
+          elements.infoTooltip.classList.add('hidden');
+          elements.btnToggleInfo.classList.remove('active');
+        }
+      }
     });
   }
 
