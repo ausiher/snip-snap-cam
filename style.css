@@ -312,6 +312,7 @@ body.theme-sage {
   z-index: 1;
   display: block;
   background: #000;
+  transform: scaleX(-1);
 }
 
 #viewfinder-canvas {
@@ -324,6 +325,7 @@ body.theme-sage {
   z-index: 2;
   pointer-events: none;
   background: transparent;
+  transform: scaleX(-1);
 }
 
 /* HUD Overlay on Viewfinder */

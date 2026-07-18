@@ -1134,10 +1134,6 @@ function drawFrame() {
   ctx2d.clearRect(0, 0, w, h);
 
   ctx2d.save();
-  if (state.isMirrorActive) {
-    ctx2d.translate(w, 0);
-    ctx2d.scale(-1, 1);
-  }
 
   if (state.focusProgress > 0.005 && state.smoothedRect) {
     const rect = state.smoothedRect;
