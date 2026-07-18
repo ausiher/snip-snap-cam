@@ -246,82 +246,125 @@ function getLCorner(lm, cw, ch) {
   return { x: (p2.x + p5.x) * 0.5, y: (p2.y + p5.y) * 0.5 };
 }
 
-function calcRect(cw, ch, hands) {
-  const activeHands = hands.filter(h => h.isL || h.isFolded);
-  if (activeHands.length !== 2) return null;
-  const A = getLCorner(activeHands[0].landmarks, cw, ch);
-  const B = getLCorner(activeHands[1].landmarks, cw, ch);
-  if (!A || !B) return null;
+// ─── Frame Estimation ────────────────────────────────────────────────
+// Constants for smoothing and outlier rejection
+const FRAME_SMOOTH = {
+  center: 0.10,  // position EMA weight
+  size:   0.07,  // width/height EMA weight
+  angle:  0.05   // rotation EMA weight (most aggressive)
+};
+const FRAME_MAX_DELTA = {
+  centerPx:  150,   // max pixel jump per frame before rejection
+  sizeRatio: 0.35,  // max fractional size change per frame
+  angleRad:  0.40   // max rotation jump per frame (~23°)
+};
 
-  const lm0 = activeHands[0].landmarks;
-  const lm1 = activeHands[1].landmarks;
+/**
+ * Step 2-5: Estimate raw frame parameters from two detected L-hands.
+ * Returns { cx, cy, width, height, theta } or null if estimation fails.
+ * Does NOT build the rectangle — that is done in buildRect().
+ */
+function estimateFrameParams(cw, ch, hands) {
+  const active = hands.filter(h => h.isL || h.isFolded);
+  if (active.length < 2) return null;
 
-  // Index finger direction for each hand: wrist → index tip
-  const i0x = lm0[8].x * cw - lm0[0].x * cw;
-  const i0y = lm0[8].y * ch - lm0[0].y * ch;
-  const i1x = lm1[8].x * cw - lm1[0].x * cw;
-  const i1y = lm1[8].y * ch - lm1[0].y * ch;
-  const len0 = Math.sqrt(i0x*i0x + i0y*i0y);
-  const len1 = Math.sqrt(i1x*i1x + i1y*i1y);
+  const lm0 = active[0].landmarks;
+  const lm1 = active[1].landmarks;
+
+  // ── Step 2: Frame Center ─────────────────────────────────────────
+  // Average all key landmarks from both hands for a stable centroid
+  const KEY = [0, 4, 5, 8]; // wrist, thumb-tip, index-MCP, index-tip
+  let cx = 0, cy = 0;
+  for (const lm of [lm0, lm1]) {
+    for (const i of KEY) { cx += lm[i].x * cw; cy += lm[i].y * ch; }
+  }
+  cx /= KEY.length * 2;
+  cy /= KEY.length * 2;
+
+  // ── Step 3: Frame Rotation ───────────────────────────────────────
+  // Use wrist→index-MCP direction (proximal knuckle, more stable than tip)
+  const d0x = lm0[5].x * cw - lm0[0].x * cw;
+  const d0y = lm0[5].y * ch - lm0[0].y * ch;
+  const d1x = lm1[5].x * cw - lm1[0].x * cw;
+  const d1y = lm1[5].y * ch - lm1[0].y * ch;
+  const len0 = Math.sqrt(d0x*d0x + d0y*d0y);
+  const len1 = Math.sqrt(d1x*d1x + d1y*d1y);
   if (len0 < 5 || len1 < 5) return null;
 
-  // Normalize each direction
-  const n0x = i0x / len0, n0y = i0y / len0;
-  let n1x = i1x / len1, n1y = i1y / len1;
+  let n0x = d0x / len0, n0y = d0y / len0;
+  let n1x = d1x / len1, n1y = d1y / len1;
+  // Align n1 to n0 direction (prevent cancellation when hands face opposite)
+  if (n0x*n1x + n0y*n1y < 0) { n1x = -n1x; n1y = -n1y; }
 
-  // Align n1 to n0 to avoid cancellation when hands face different ways
-  if (n0x * n1x + n0y * n1y < 0) { n1x = -n1x; n1y = -n1y; }
-
-  // Average index direction = "up" axis of the viewfinder frame
-  let upX = n0x + n1x;
-  let upY = n0y + n1y;
+  // Average "up" direction of the frame
+  let upX = n0x + n1x, upY = n0y + n1y;
   const upLen = Math.sqrt(upX*upX + upY*upY);
   if (upLen < 0.01) return null;
   upX /= upLen; upY /= upLen;
-
-  // Ensure "up" axis always points upward on screen (negative Y)
+  // Ensure upward on screen (negative Y)
   if (upY > 0) { upX = -upX; upY = -upY; }
 
-  // Perpendicular = horizontal axis of the frame (rightward)
-  // Two options: (-upY, upX) or (upY, -upX)
-  // Pick the one whose dot product with thumb-of-hand0 is positive (inside the L)
+  // Horizontal axis = perpendicular, oriented from hand-0 toward hand-1
   let hzX = -upY, hzY = upX;
-  const thb0x = lm0[4].x * cw - A.x;
-  const thb0y = lm0[4].y * ch - A.y;
-  if (hzX * thb0x + hzY * thb0y < 0) { hzX = -hzX; hzY = -hzY; }
+  const h0cx = (lm0[0].x + lm0[5].x) * 0.5 * cw;
+  const h0cy = (lm0[0].y + lm0[5].y) * 0.5 * ch;
+  const h1cx = (lm1[0].x + lm1[5].x) * 0.5 * cw;
+  const h1cy = (lm1[0].y + lm1[5].y) * 0.5 * ch;
+  if (hzX * (h1cx - h0cx) + hzY * (h1cy - h0cy) < 0) { hzX = -hzX; hzY = -hzY; }
 
-  // Frame dimensions:
-  // Width  = A→B projected onto horizontal axis, minus palm margins
-  // Height = average index-tip-to-wrist length
-  const p0 = { x: lm0[0].x * cw, y: lm0[0].y * ch };
-  const p9 = { x: lm0[9].x * cw, y: lm0[9].y * ch };
-  const palmSize = Math.sqrt(dist2dSq(p0, p9));
-  const margin = palmSize * 0.38;
-
-  const abX = B.x - A.x, abY = B.y - A.y;
-  const projW = Math.abs(abX * hzX + abY * hzY);
-  const W = Math.max(40, projW - margin * 2);
-  const H = Math.max(40, (len0 + len1) * 0.5 - palmSize * 0.2);
-
-  const Cx = (A.x + B.x) * 0.5;
-  const Cy = (A.y + B.y) * 0.5;
-
-  // theta = angle of horizontal axis — used for smoothed lerp
+  // Single rotation angle for the entire frame
   const theta = Math.atan2(hzY, hzX);
 
-  const hw = W * 0.5;
-  const hh = H * 0.5;
+  // ── Step 4: Width ────────────────────────────────────────────────
+  // Distance between hand centroids projected onto horizontal axis
+  const p0_wrist = { x: lm0[0].x * cw, y: lm0[0].y * ch };
+  const p0_m9    = { x: lm0[9].x * cw, y: lm0[9].y * ch };
+  const palmSize = Math.sqrt(dist2dSq(p0_wrist, p0_m9));
+
+  const hvX = h1cx - h0cx, hvY = h1cy - h0cy;
+  const rawW = Math.abs(hvX * hzX + hvY * hzY);
+  const width = Math.max(40, rawW - palmSize * 0.3);
+
+  // ── Step 5: Height ───────────────────────────────────────────────
+  // Average wrist→index-tip span for each hand
+  const h0H = Math.sqrt(
+    (lm0[8].x * cw - lm0[0].x * cw)**2 + (lm0[8].y * ch - lm0[0].y * ch)**2
+  );
+  const h1H = Math.sqrt(
+    (lm1[8].x * cw - lm1[0].x * cw)**2 + (lm1[8].y * ch - lm1[0].y * ch)**2
+  );
+  const height = Math.max(40, (h0H + h1H) * 0.5 - palmSize * 0.15);
+
+  // Landmark anchors for debug rendering
+  const h1pt = { x: h0cx, y: h0cy };
+  const h3pt = { x: h1cx, y: h1cy };
+
+  return { cx, cy, width, height, theta, h1: h1pt, h3: h3pt };
+}
+
+/**
+ * Step 6: Build a perfect rectangle from scalar frame parameters.
+ * Corners are computed algebraically — never inferred from landmarks.
+ */
+function buildRect(p) {
+  const { cx, cy, width, height, theta } = p;
+  const cosT = Math.cos(theta), sinT = Math.sin(theta);
+  const hw = width  * 0.5;
+  const hh = height * 0.5;
+  // Rotate local corner then translate
+  const rt = (lx, ly) => ({
+    x: cx + lx * cosT - ly * sinT,
+    y: cy + lx * sinT + ly * cosT
+  });
   return {
-    center: { x: Cx, y: Cy },
-    width: W,
-    height: H,
-    theta,
-    h1: A,
-    h3: B,
-    c1: { x: Cx - hw * hzX - hh * upX, y: Cy - hw * hzY - hh * upY },
-    c2: { x: Cx + hw * hzX - hh * upX, y: Cy + hw * hzY - hh * upY },
-    c3: { x: Cx + hw * hzX + hh * upX, y: Cy + hw * hzY + hh * upY },
-    c4: { x: Cx - hw * hzX + hh * upX, y: Cy - hw * hzY + hh * upY }
+    center: { x: cx, y: cy },
+    width, height, theta,
+    h1: p.h1 || null,
+    h3: p.h3 || null,
+    c1: rt(-hw, -hh),
+    c2: rt(+hw, -hh),
+    c3: rt(+hw, +hh),
+    c4: rt(-hw, +hh)
   };
 }
 
@@ -1135,49 +1178,83 @@ function onHandResults(results) {
   }
 }
 
+/**
+ * Step 7+8: Smooth the 5 scalar frame parameters independently and apply
+ * outlier rejection. The smoothed rect is always a perfect rectangle.
+ */
 function updateSmoothedRect() {
   if (!state.isFraming) {
     state.smoothedRect = null;
     return;
   }
-  const target = calcRect(elements.canvas.width, elements.canvas.height, state.hands);
-  if (!target) {
-    // Don't immediately null out — hold last valid frame briefly
+
+  const cw = elements.canvas.width, ch = elements.canvas.height;
+  const raw = estimateFrameParams(cw, ch, state.hands);
+
+  // Step 8: If estimation fails, hold last valid frame — don't null it out
+  if (!raw) return;
+
+  // ── Initialize on first valid frame ─────────────────────────────
+  if (!state.smoothedRect || !state.smoothedRect._p) {
+    const rect = buildRect(raw);
+    rect._p = { cx: raw.cx, cy: raw.cy, width: raw.width, height: raw.height, theta: raw.theta };
+    state.smoothedRect = rect;
     return;
   }
-  if (!state.smoothedRect) {
-    state.smoothedRect = { ...target };
+
+  const prev = state.smoothedRect._p;
+
+  // ── Outlier rejection ─────────────────────────────────────────────
+  // Compute raw delta for each scalar
+  const dcx = Math.abs(raw.cx    - prev.cx);
+  const dcy = Math.abs(raw.cy    - prev.cy);
+  const dw  = Math.abs(raw.width - prev.width)  / Math.max(prev.width,  1);
+  const dh  = Math.abs(raw.height- prev.height) / Math.max(prev.height, 1);
+  // Shortest angular distance
+  let da = raw.theta - prev.theta;
+  while (da >  Math.PI) da -= Math.PI * 2;
+  while (da < -Math.PI) da += Math.PI * 2;
+  // Handle ambiguity: rotation + π is the same rectangle
+  if (Math.abs(da) > Math.PI / 2) da = da > 0 ? da - Math.PI : da + Math.PI;
+  da = Math.abs(da);
+
+  if (
+    dcx > FRAME_MAX_DELTA.centerPx  ||
+    dcy > FRAME_MAX_DELTA.centerPx  ||
+    dw  > FRAME_MAX_DELTA.sizeRatio ||
+    dh  > FRAME_MAX_DELTA.sizeRatio ||
+    da  > FRAME_MAX_DELTA.angleRad
+  ) {
+    // Outlier — continue rendering previous valid frame unchanged
     return;
   }
 
-  const alphaSlow = 0.05;  // position/size
-  const alphaAngle = 0.04; // angle is smoothed more aggressively
-  const cur = state.smoothedRect;
+  // ── Step 7: Smooth each scalar independently ──────────────────────
+  const sc = FRAME_SMOOTH.center;
+  const ss = FRAME_SMOOTH.size;
+  const sa = FRAME_SMOOTH.angle;
 
-  cur.center.x = lerp(cur.center.x, target.center.x, alphaSlow);
-  cur.center.y = lerp(cur.center.y, target.center.y, alphaSlow);
-  cur.width    = lerp(cur.width,    target.width,    alphaSlow);
-  cur.height   = lerp(cur.height,   target.height,   alphaSlow);
+  const sCx = lerp(prev.cx,     raw.cx,     sc);
+  const sCy = lerp(prev.cy,     raw.cy,     sc);
+  const sW  = lerp(prev.width,  raw.width,  ss);
+  const sH  = lerp(prev.height, raw.height, ss);
 
-  // Anti-flip: if target theta differs from current by >90°, offset by ±π to pick nearer direction
-  let targetTheta = target.theta;
-  let diff = targetTheta - cur.theta;
-  while (diff >  Math.PI / 2) { targetTheta -= Math.PI; diff = targetTheta - cur.theta; }
-  while (diff < -Math.PI / 2) { targetTheta += Math.PI; diff = targetTheta - cur.theta; }
-  cur.theta = cur.theta + diff * alphaAngle;
+  // Angle: shortest-path lerp, collapse ambiguity (rect at theta == rect at theta+π)
+  let thetaDiff = raw.theta - prev.theta;
+  while (thetaDiff >  Math.PI) thetaDiff -= Math.PI * 2;
+  while (thetaDiff < -Math.PI) thetaDiff += Math.PI * 2;
+  if (Math.abs(thetaDiff) > Math.PI / 2) {
+    thetaDiff = thetaDiff > 0 ? thetaDiff - Math.PI : thetaDiff + Math.PI;
+  }
+  const sTheta = prev.theta + thetaDiff * sa;
 
-  const cosT = Math.cos(cur.theta), sinT = Math.sin(cur.theta);
-  const hw = cur.width * 0.5;
-  const hh = cur.height * 0.5;
-  // hzX/hzY = horizontal axis, upX/upY = vertical axis
-  const hzX = cosT, hzY = sinT;
-  const upX = -sinT, upY = cosT;
-  cur.c1 = { x: cur.center.x - hw * hzX - hh * upX, y: cur.center.y - hw * hzY - hh * upY };
-  cur.c2 = { x: cur.center.x + hw * hzX - hh * upX, y: cur.center.y + hw * hzY - hh * upY };
-  cur.c3 = { x: cur.center.x + hw * hzX + hh * upX, y: cur.center.y + hw * hzY + hh * upY };
-  cur.c4 = { x: cur.center.x - hw * hzX + hh * upX, y: cur.center.y - hw * hzY + hh * upY };
-  cur.h1 = target.h1;
-  cur.h3 = target.h3;
+  const smoothed = { cx: sCx, cy: sCy, width: sW, height: sH, theta: sTheta,
+                     h1: raw.h1, h3: raw.h3 };
+
+  // ── Step 6: Build perfect rectangle from smoothed scalars ─────────
+  const rect = buildRect(smoothed);
+  rect._p = { cx: sCx, cy: sCy, width: sW, height: sH, theta: sTheta };
+  state.smoothedRect = rect;
 }
 
 function drawFrame() {
