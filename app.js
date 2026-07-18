@@ -1,3 +1,6 @@
+import { FilesetResolver, FaceLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs";
+import { FilterEngine } from './core/FilterEngine.js';
+
 /**
  * SNIP SNAP! // Gesture Retro Film Camera
  * Unified Single File Coordinator (No imports/exports)
@@ -5,6 +8,10 @@
 
 // ─── 1. State System ────────────────────────────────────────────────
 const state = {
+  faceFilterActive: true,
+  faceMeshActive: false,
+  faceFilters: { eye: 1.0, forehead: 1.0, chin: 1.0, nose: 1.0, mouth: 1.0 },
+  lastFaceTime: 0,
   systemInitialized: false,
   isMirrorActive: true,
   isHudActive: true,
@@ -70,6 +77,63 @@ const elements = {
   get btnPopupDownload() { return document.getElementById('btn-popup-download'); },
   get btnPopupClose() { return document.getElementById('btn-popup-close'); }
 };
+// ─── Face Morph Filter Helpers ────────────────────────────────────────
+let faceLandmarker = null;
+let engine = null;
+let deformedCanvas = document.createElement('canvas');
+
+async function initFaceLandmarker() {
+  try {
+    const filesetResolver = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+    );
+    faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+      baseOptions: {
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+        delegate: "GPU"
+      },
+      outputFaceBlendshapes: true,
+      outputFacialTransformationMatrixes: true,
+      runningMode: "VIDEO",
+      numFaces: 1
+    });
+    console.log("Face Landmarker successfully loaded!");
+  } catch (err) {
+    console.error("Error loading Face Landmarker:", err);
+  }
+}
+
+function randomizeFaceFilters() {
+  state.faceFilters.eye = Math.random() < 0.5 ? 0.0 : 2.0;
+  state.faceFilters.forehead = Math.random() < 0.5 ? 0.0 : 2.0;
+  state.faceFilters.chin = Math.random() < 0.5 ? 0.0 : 2.0;
+  state.faceFilters.nose = Math.random() < 0.5 ? 0.0 : 2.0;
+  state.faceFilters.mouth = Math.random() < 0.5 ? 0.0 : 2.0;
+  console.log("Comical Face Filter randomized:", state.faceFilters);
+}
+
+function drawRawWebcamToDeformed() {
+  if (engine && elements.webcam && elements.webcam.readyState >= 2) {
+    const gl = engine.gl;
+    gl.bindTexture(gl.TEXTURE_2D, engine.webcamTexture);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, elements.webcam);
+    gl.viewport(0, 0, deformedCanvas.width, deformedCanvas.height);
+    gl.useProgram(engine.program);
+    
+    // Set u_blend to 0.0 to draw raw
+    const blendLoc = gl.getUniformLocation(engine.program, "u_blend");
+    gl.uniform1f(blendLoc, 0.0);
+    
+    // Bind position buffer
+    const posAttr = gl.getAttribLocation(engine.program, "a_position");
+    gl.enableVertexAttribArray(posAttr);
+    gl.bindBuffer(gl.ARRAY_BUFFER, engine.positionBuffer);
+    gl.vertexAttribPointer(posAttr, 2, gl.FLOAT, false, 0, 0);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  }
+}
+
 
 let ctx = null;
 function getCtx() {
@@ -1048,6 +1112,13 @@ async function startSystem() {
     if (!handsDetector) {
       initMediaPipe();
     }
+    if (!faceLandmarker) {
+      await initFaceLandmarker();
+    }
+    if (!engine) {
+      engine = new FilterEngine(deformedCanvas, null);
+      randomizeFaceFilters(); // Initial random face configuration
+    }
 
     state.systemInitialized = true;
     updateCameraToggleUI(true);
@@ -1068,6 +1139,10 @@ function resizeCanvas() {
     const vh = elements.webcam.videoHeight || 720;
     elements.canvas.width = vw;
     elements.canvas.height = vh;
+    if (deformedCanvas) {
+      deformedCanvas.width = vw;
+      deformedCanvas.height = vh;
+    }
   }
 }
 
@@ -1106,6 +1181,35 @@ function mainLoop() {
       } else {
         mpBusy = false;
       }
+    }
+
+    // Run Face Landmarker if active and loaded
+    if (faceLandmarker && elements.webcam && elements.webcam.readyState >= 2) {
+      const now = performance.now();
+      const dt = now - (state.lastFaceTime || now);
+      state.lastFaceTime = now;
+
+      const results = faceLandmarker.detectForVideo(elements.webcam, now);
+      if (results && results.faceLandmarks && results.faceLandmarks.length > 0) {
+        if (engine) {
+          engine.updateParameters({
+            blend: state.faceFilterActive ? 1.0 : 0.0,
+            showDots: false,
+            beforeAfter: false,
+            eye: state.faceFilters.eye,
+            forehead: state.faceFilters.forehead,
+            chin: state.faceFilters.chin,
+            nose: state.faceFilters.nose,
+            mouth: state.faceFilters.mouth
+          });
+          engine.process(results, dt);
+          engine.render(elements.webcam);
+        }
+      } else {
+        drawRawWebcamToDeformed();
+      }
+    } else {
+      drawRawWebcamToDeformed();
     }
 
     if (state.isFraming) {
@@ -1246,7 +1350,7 @@ function drawFrame() {
     const rect = state.smoothedRect;
     ctx2d.save();
     ctx2d.filter = getThemeOutsideFilter(state.focusProgress);
-    ctx2d.drawImage(elements.webcam, 0, 0, w, h);
+    ctx2d.drawImage(deformedCanvas, 0, 0, w, h);
     ctx2d.restore();
 
     ctx2d.save();
@@ -1270,12 +1374,25 @@ function drawFrame() {
     ctx2d.closePath();
     ctx2d.clip();
     ctx2d.filter = getThemeInsideFilter(state.focusProgress);
-    ctx2d.drawImage(elements.webcam, 0, 0, w, h);
+    ctx2d.drawImage(deformedCanvas, 0, 0, w, h);
     ctx2d.restore();
 
     drawBorder(rect, cfg);
+  } else {
+    ctx2d.drawImage(deformedCanvas, 0, 0, w, h);
   }
 
+  if (state.faceMeshActive && engine && engine.renderVertices && engine.faceCenter) {
+    ctx2d.fillStyle = "rgba(0, 255, 210, 0.75)";
+    for (let i = 0; i < 478; i++) {
+      const idx = i * 3;
+      const x = engine.renderVertices[idx];
+      const y = engine.renderVertices[idx + 1];
+      ctx2d.beginPath();
+      ctx2d.arc(x, y, 1.2, 0, 2 * Math.PI);
+      ctx2d.fill();
+    }
+  }
   if (state.isTrackingActive && state.hands.length > 0) {
     drawLandmarks(w, h);
   }
@@ -1427,12 +1544,12 @@ function captureSnapshot() {
       const destX = (w - destW) / 2;
       const destY = (h - destH) / 2;
 
-      tc.drawImage(elements.webcam, minX, minY, cropW, cropH, destX, destY, destW, destH);
+      tc.drawImage(deformedCanvas, minX, minY, cropW, cropH, destX, destY, destW, destH);
     } else {
-      tc.drawImage(elements.webcam, 0, 0, w, h);
+      tc.drawImage(deformedCanvas, 0, 0, w, h);
     }
   } else {
-    tc.drawImage(elements.webcam, 0, 0, w, h);
+    tc.drawImage(deformedCanvas, 0, 0, w, h);
   }
   tc.restore();
 
@@ -1454,6 +1571,7 @@ function captureSnapshot() {
     time: now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
   };
 
+  randomizeFaceFilters(); // Randomize face filter deformations for the next shot
   state.photos.push(photo);
   appendToFilm(photo);
 
@@ -1487,6 +1605,36 @@ function boot() {
       playTickSound();
     };
   });
+
+  const btnFilterToggle = document.getElementById('btn-filter-toggle');
+  if (btnFilterToggle) {
+    btnFilterToggle.onclick = () => {
+      state.faceFilterActive = !state.faceFilterActive;
+      if (state.faceFilterActive) {
+        btnFilterToggle.className = "btn-control-floating filter-btn-on";
+        btnFilterToggle.title = "Face Morph Filter Active";
+      } else {
+        btnFilterToggle.className = "btn-control-floating filter-btn-off";
+        btnFilterToggle.title = "Face Morph Filter Off";
+      }
+      playTickSound();
+    };
+  }
+
+  const btnMeshToggle = document.getElementById('btn-mesh-toggle');
+  if (btnMeshToggle) {
+    btnMeshToggle.onclick = () => {
+      state.faceMeshActive = !state.faceMeshActive;
+      if (state.faceMeshActive) {
+        btnMeshToggle.className = "btn-control-floating mesh-btn-on";
+        btnMeshToggle.title = "Face Mesh Landmarks Active";
+      } else {
+        btnMeshToggle.className = "btn-control-floating mesh-btn-off";
+        btnMeshToggle.title = "Face Mesh Landmarks Off";
+      }
+      playTickSound();
+    };
+  }
 
   const btnCamToggle = elements.btnCameraToggle || document.getElementById('btn-camera-toggle');
   if (btnCamToggle) {
