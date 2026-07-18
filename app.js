@@ -425,6 +425,23 @@ function calcRect(cw, ch, hands) {
     h3Bracket = 'top-right';
   }
 
+  // Scale down width and height to sit inside the finger frame (yellow outline requirement)
+  const shrinkFactor = 0.82;
+  W = W * shrinkFactor;
+  H = H * shrinkFactor;
+
+  // Recompute c1, c2, c3, c4 symmetrically from center using the scaled W and H
+  const cosT = Math.cos(theta), sinT = Math.sin(theta);
+  const hw = W * 0.5;
+  const hh = H * 0.5;
+  const hzX_local = cosT, hzY_local = sinT;
+  const upX_local = -sinT, upY_local = cosT;
+
+  c1 = { x: center.x - hw * hzX_local - hh * upX_local, y: center.y - hw * hzY_local - hh * upY_local };
+  c2 = { x: center.x + hw * hzX_local - hh * upX_local, y: center.y + hw * hzY_local - hh * upY_local };
+  c3 = { x: center.x + hw * hzX_local + hh * upX_local, y: center.y + hw * hzY_local + hh * upY_local };
+  c4 = { x: center.x - hw * hzX_local + hh * upX_local, y: center.y - hw * hzY_local + hh * upY_local };
+
   return {
     center,
     width: W,
@@ -1305,8 +1322,8 @@ function updateSmoothedRect() {
     return;
   }
 
-  const alphaSlow = 0.05;  // position/size
-  const alphaAngle = 0.04; // angle is smoothed more aggressively
+  const alphaSlow = 0.20;  // position/size
+  const alphaAngle = 0.18; // angle is smoothed more aggressively
   const cur = state.smoothedRect;
 
   cur.center.x = lerp(cur.center.x, target.center.x, alphaSlow);
