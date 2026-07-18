@@ -1375,6 +1375,21 @@ function drawLandmarks(w, h) {
   }
 }
 
+function getRandomFilterString() {
+  const contrast = (0.8 + Math.random() * 0.5).toFixed(2);       // 0.8 - 1.3
+  const saturate = (0.6 + Math.random() * 0.9).toFixed(2);        // 0.6 - 1.5
+  const sepia = (Math.random() * 0.5).toFixed(2);                 // 0.0 - 0.5
+  const hueRotate = Math.floor(-20 + Math.random() * 40);         // -20 to +20 deg
+  const brightness = (0.9 + Math.random() * 0.2).toFixed(2);      // 0.9 - 1.1
+  const grayscale = Math.random() < 0.2 ? (Math.random() * 0.25).toFixed(2) : 0;
+  
+  let filter = `contrast(${contrast}) saturate(${saturate}) sepia(${sepia}) hue-rotate(${hueRotate}deg) brightness(${brightness})`;
+  if (grayscale > 0) {
+    filter += ` grayscale(${grayscale})`;
+  }
+  return filter;
+}
+
 function captureSnapshot() {
   if (state.photos.length >= state.maxPhotos) return;
   const w = elements.canvas.width, h = elements.canvas.height;
@@ -1386,6 +1401,9 @@ function captureSnapshot() {
   const tc = temp.getContext('2d');
   
   tc.save();
+  
+  // Apply a randomized vintage photo filter so each snapshot is unique
+  tc.filter = getRandomFilterString();
 
   if (state.smoothedRect) {
     const rect = state.smoothedRect;
@@ -1409,7 +1427,6 @@ function captureSnapshot() {
       const destX = (w - destW) / 2;
       const destY = (h - destH) / 2;
 
-      tc.filter = getThemeInsideFilter(1.0);
       tc.drawImage(elements.webcam, minX, minY, cropW, cropH, destX, destY, destW, destH);
     } else {
       tc.drawImage(elements.webcam, 0, 0, w, h);
