@@ -9,26 +9,26 @@ An interactive web-based camera application combining computer vision gesture tr
 ```mermaid
 flowchart TD
     %% Input Source
-    Webcam[📷 Webcam Video Stream] --> Coordinator[app.js Coordinator Loop]
+    Webcam["📷 Webcam Video Stream"] --> Coordinator["app.js Coordinator Loop"]
     
     %% Concurrent Detection Channels
-    subgraph Detection [Concurrent AI Tracking]
-        Coordinator -->|MediaPipe Hands| HandTrack[🫱 Hands Detector]
-        Coordinator -->|MediaPipe Face (Alternate Frames)| FaceTrack[👤 Face Landmarker]
+    subgraph Detection ["Concurrent AI Tracking"]
+        Coordinator -->|"MediaPipe Hands"| HandTrack["🫱 Hands Detector"]
+        Coordinator -->|"MediaPipe Face"| FaceTrack["👤 Face Landmarker"]
     end
 
     %% Pipeline processing
-    HandTrack -->|Corner Coordinates| Viewfinder[📐 Rotated Viewfinder Math]
-    FaceTrack -->|478 Landmarks & Scale| WebGLFilter[✨ WebGL Face Morph Engine]
+    HandTrack -->|"Corner Coordinates"| Viewfinder["📐 Rotated Viewfinder Math"]
+    FaceTrack -->|"478 Landmarks & Scale"| WebGLFilter["✨ WebGL Face Morph Engine"]
 
     %% Compositing
-    WebGLFilter -->|Deformed Texture| Canvas[🎨 Viewfinder Canvas 2D]
-    Viewfinder -->|Focus Region & Aspect Inset| Canvas
+    WebGLFilter -->|"Deformed Texture"| Canvas["🎨 Viewfinder Canvas 2D"]
+    Viewfinder -->|"Focus Region & Aspect Inset"| Canvas
 
     %% Action / Capturing
-    Canvas -->|Index Finger Trigger Pull| Capture[📸 Snapshot Captured]
-    Capture -->|Random Retro Film Filters| SnapCard[🎞️ 35mm Digital Roll Negative]
-    SnapCard -->|Collage Builder (4 Snaps)| Collage[🖼️ Custom 2x2 Grid/Strip/Proof Sheet]
+    Canvas -->|"Index Finger Trigger Pull"| Capture["📸 Snapshot Captured"]
+    Capture -->|"Random Retro Film Filters"| SnapCard["🎞️ 35mm Digital Roll Negative"]
+    SnapCard -->|"Collage Builder (4 Snaps)"| Collage["🖼️ Custom 2x2 Grid/Strip/Proof Sheet"]
 ```
 
 ---
