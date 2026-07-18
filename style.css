@@ -546,7 +546,7 @@ body.theme-sage {
 .floating-roll-tray {
   position: absolute;
   left: 50%;
-  bottom: -280px; /* starts off-screen */
+  bottom: -100%; /* starts fully off-screen */
   transform: translateX(-50%);
   width: 90%;
   max-width: 480px;
@@ -1564,58 +1564,94 @@ body.theme-sage {
 
 /* --- Mobile / Vertical Layout Styles --- */
 @media (max-width: 768px), (orientation: portrait) {
+  /* CRITICAL: Keep body and containers fullscreen for camera */
   body {
-    overflow-y: auto;
-    height: auto;
-    min-height: 100vh;
+    overflow: hidden;
+    height: 100vh;
+    height: 100dvh; /* dynamic viewport for mobile browsers */
   }
 
   .app-container {
-    grid-template-columns: 100%;
-    grid-template-rows: auto auto;
-    height: auto;
-    width: 100%;
-    overflow-y: auto;
-    overflow-x: hidden;
-  }
-
-  .viewfinder-section {
-    padding: 16px;
-    height: auto;
-    min-height: 0;
-    gap: 16px;
-  }
-
-  .canvas-wrapper {
-    margin: 10px 0;
-    aspect-ratio: 4/3;
-    width: 100%;
-    height: auto;
-    max-height: 50vh;
-    flex-grow: 0;
-  }
-
-  .film-ribbon-section {
-    border-left: none;
-    border-top: 2px solid oklch(0.12 0.01 25);
-    height: auto;
-    width: 100%;
     position: relative;
-    padding-bottom: 24px;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
   }
 
-  .sprocket-track-left,
-  .sprocket-track-right {
-    display: none; /* Hide vertical sprocket holes on mobile scroll */
+  /* Viewfinder MUST stay fullscreen — no padding, no height:auto */
+  .viewfinder-section {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+  }
+
+  /* Canvas fills the entire viewport */
+  .canvas-wrapper {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    aspect-ratio: unset;
+    max-height: none;
+    flex-grow: 1;
+  }
+
+  #viewfinder-canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* HUD adjustments for smaller screens */
+  .hud-overlay {
+    padding: 16px;
+  }
+
+  .hud-controls-floating {
+    top: 16px;
+    right: 16px;
+    gap: 8px;
+  }
+
+  .hud-info-floating {
+    top: 16px;
+    left: 16px;
+  }
+
+  .btn-control-floating {
+    width: 36px;
+    height: 36px;
+  }
+
+  .btn-control-floating svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Floating film roll button */
+  .btn-floating-roll {
+    bottom: 20px;
+    right: 20px;
+  }
+
+  /* Film tray slide-up panel adjustments */
+  .floating-roll-tray {
+    max-height: 55vh;
   }
 
   .film-strip {
     flex-direction: row;
     overflow-x: auto;
     overflow-y: hidden;
-    padding: 16px 20px;
-    height: 180px;
-    gap: 16px;
+    padding: 12px 16px;
+    height: 160px;
+    gap: 12px;
     white-space: nowrap;
   }
 
@@ -1625,13 +1661,13 @@ body.theme-sage {
   }
 
   .film-strip-placeholder svg {
-    width: 32px;
-    height: 32px;
-    margin-bottom: 8px;
+    width: 28px;
+    height: 28px;
+    margin-bottom: 6px;
   }
 
   .film-strip-placeholder p {
-    font-size: 0.85rem;
+    font-size: 0.8rem;
   }
 
   .film-strip-placeholder span {
@@ -1640,11 +1676,11 @@ body.theme-sage {
   }
 
   .film-frame {
-    width: 130px;
-    height: 146px;
+    width: 115px;
+    height: 130px;
     flex-shrink: 0;
-    padding: 8px;
-    transform: none !important; /* Disable rotation styling on mobile scroll */
+    padding: 6px;
+    transform: none !important;
   }
 
   .film-frame:hover {
@@ -1653,40 +1689,54 @@ body.theme-sage {
 
   .film-frame::before,
   .film-frame::after {
-    display: none; /* Hide vertical film edge numbers */
+    display: none;
   }
 
   .film-frame-meta {
     margin-top: 4px;
-    font-size: 0.55rem;
+    font-size: 0.5rem;
   }
 
   .film-img-container {
     aspect-ratio: 4/3;
   }
 
+  /* Gesture guide at bottom */
+  .hud-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 
+  .gesture-guide {
+    font-size: 0.7rem;
+    padding: 6px 12px;
+    margin-bottom: 60px; /* clear the floating roll button */
+  }
 
+  /* Popup adjustments */
   .popup-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
-  
+
   .popup-card {
     padding: 20px;
+    max-height: 90vh;
+    max-height: 90dvh;
+    overflow-y: auto;
   }
-  
+
   .popup-title {
     font-size: 1.3rem;
   }
 
-  /* Collage Modal scale adjustments */
+  /* Collage Modal adjustments */
   .collage-wrapper {
     grid-template-columns: 100%;
     grid-template-rows: auto 1fr;
     width: 95%;
     height: 95%;
     max-height: 95vh;
+    max-height: 95dvh;
   }
 
   .collage-sidebar {
@@ -1694,12 +1744,22 @@ body.theme-sage {
     border-bottom: 1px solid oklch(0.25 0.01 25);
     padding: 16px;
     height: auto;
-    max-height: 40vh;
+    max-height: 35vh;
+    overflow-y: auto;
   }
 
   .collage-preview-panel {
-    padding: 16px;
-    min-height: 300px;
+    padding: 12px;
+    min-height: 250px;
+  }
+
+  /* Polaroid modal sizing */
+  .polaroid-wrapper {
+    max-width: 92vw;
+  }
+
+  .polaroid-card {
+    max-width: 85vw;
   }
 }
 

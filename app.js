@@ -47,24 +47,71 @@ function getThemeOuterOverlay(progress) {
 
 // ─── Startup ─────────────────────────────────────────────────────────
 async function startSystem() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
-      audio: false
-    });
-    elements.webcam.srcObject = stream;
-    elements.webcam.addEventListener('loadedmetadata', () => {
-      elements.webcam.play();
-      resizeCanvas();
-      window.addEventListener('resize', resizeCanvas);
-      initMediaPipe();
-      state.systemInitialized = true;
-      requestAnimationFrame(mainLoop);
-    });
-  } catch (err) {
-    console.error('Camera error:', err);
-    alert('Camera access required. Please grant permissions and refresh.');
+  // Show a loading indicator on the canvas immediately
+  const loadCtx = elements.canvas.getContext('2d');
+  elements.canvas.width = window.innerWidth;
+  elements.canvas.height = window.innerHeight;
+  loadCtx.fillStyle = '#000';
+  loadCtx.fillRect(0, 0, elements.canvas.width, elements.canvas.height);
+  loadCtx.fillStyle = 'rgba(255,255,255,0.5)';
+  loadCtx.font = '14px "Space Grotesk", sans-serif';
+  loadCtx.textAlign = 'center';
+  loadCtx.fillText('Starting camera…', elements.canvas.width / 2, elements.canvas.height / 2);
+
+  // Camera constraint sets to try in order (prefer user-facing for selfie cam)
+  const constraintsList = [
+    { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }, audio: false },
+    { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'environment' }, audio: false },
+    { video: true, audio: false }  // Absolute fallback — any camera
+  ];
+
+  let stream = null;
+  for (const constraints of constraintsList) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      break; // Success — exit loop
+    } catch (e) {
+      console.warn('Camera attempt failed:', constraints, e);
+    }
   }
+
+  if (!stream) {
+    // All attempts failed — draw error on canvas
+    loadCtx.fillStyle = '#000';
+    loadCtx.fillRect(0, 0, elements.canvas.width, elements.canvas.height);
+    loadCtx.fillStyle = '#ff4444';
+    loadCtx.font = 'bold 16px "Space Grotesk", sans-serif';
+    loadCtx.textAlign = 'center';
+    loadCtx.fillText('⚠ Camera access denied', elements.canvas.width / 2, elements.canvas.height / 2 - 12);
+    loadCtx.fillStyle = 'rgba(255,255,255,0.4)';
+    loadCtx.font = '13px "Space Grotesk", sans-serif';
+    loadCtx.fillText('Grant camera permission and refresh', elements.canvas.width / 2, elements.canvas.height / 2 + 16);
+    return;
+  }
+
+  elements.webcam.srcObject = stream;
+  elements.webcam.setAttribute('playsinline', '');
+  elements.webcam.setAttribute('muted', '');
+  elements.webcam.muted = true;
+
+  // Wait for video metadata to load (with timeout for slow mobile init)
+  await new Promise((resolve) => {
+    const onReady = () => {
+      elements.webcam.removeEventListener('loadedmetadata', onReady);
+      resolve();
+    };
+    elements.webcam.addEventListener('loadedmetadata', onReady);
+    // Safety timeout: resolve anyway after 5s
+    setTimeout(resolve, 5000);
+  });
+
+  try { await elements.webcam.play(); } catch (_) { /* autoplay blocked — ok, we keep trying in loop */ }
+
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  initMediaPipe();
+  state.systemInitialized = true;
+  requestAnimationFrame(mainLoop);
 }
 
 function resizeCanvas() {
@@ -463,13 +510,13 @@ document.addEventListener('click', onInteract);
 document.addEventListener('touchstart', onInteract);
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    startSystem();
-    initUI();
-  });
+  document.addEventListener('DOMContentLoaded', boot);
 } else {
-  startSystem();
-  initUI();
+  boot();
 }
 
-lucide.createIcons();
+function boot() {
+  initUI();
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+  startSystem();
+}
