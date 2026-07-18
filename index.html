@@ -60,24 +60,8 @@
 
   <!-- Main Application Container -->
   <div class="app-container">
-    <!-- Left Panel: Viewfinder -->
+    <!-- Left Panel: Viewfinder (Now covers entire page) -->
     <main class="viewfinder-section">
-      <header class="camera-header">
-        <div class="brand">
-          <span class="logo-red-dot"></span>
-          <h2>SNIP SNAP!</h2>
-          <span class="model-badge">M-1</span>
-        </div>
-        <div class="theme-selector">
-          <span class="selector-label">PROFILE</span>
-          <div class="selector-options">
-            <button class="theme-btn active" data-theme="classic">CLASSIC</button>
-            <button class="theme-btn" data-theme="neon">NEON</button>
-            <button class="theme-btn" data-theme="sage">SAGE</button>
-          </div>
-        </div>
-      </header>
-
       <div class="canvas-wrapper">
         <!-- Hidden source video stream -->
         <video id="webcam" autoplay playsinline muted style="position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none;"></video>
@@ -86,6 +70,19 @@
         
         <!-- Retro Viewfinder Grid & HUD Layer -->
         <div class="hud-overlay">
+          <!-- Floating Controls (Top Right) -->
+          <div class="hud-controls-floating">
+            <button id="btn-toggle-hud" class="btn-control-floating" title="Toggle HUD Overlay">
+              <i data-lucide="eye"></i>
+            </button>
+            <button id="btn-toggle-landmarks" class="btn-control-floating" title="Toggle Tracking Dots">
+              <i data-lucide="circle-dot"></i>
+            </button>
+            <button id="btn-toggle-mirror" class="btn-control-floating" title="Mirror Camera Feed">
+              <i data-lucide="refresh-cw"></i>
+            </button>
+          </div>
+
           <!-- Crosshairs -->
           <div class="center-crosshair"></div>
 
@@ -102,30 +99,19 @@
         <div id="shutter-flash" class="shutter-flash"></div>
       </div>
 
-      <footer class="camera-footer">
-        <div class="control-row">
-          <button id="btn-toggle-hud" class="btn btn-icon" title="Toggle HUD Overlay">
-            <i data-lucide="eye"></i> <span>HUD</span>
-          </button>
-          <button id="btn-toggle-landmarks" class="btn btn-icon" title="Toggle Tracking Dots">
-            <i data-lucide="circle-dot"></i> <span>TRACKING</span>
-          </button>
-          <button id="btn-toggle-mirror" class="btn btn-icon" title="Mirror Camera Feed">
-            <i data-lucide="refresh-cw"></i> <span>MIRROR</span>
-          </button>
-        </div>
-      </footer>
+      <!-- Floating Film Roll Toggle Button -->
+      <button id="btn-toggle-roll" class="btn-floating-roll" title="Toggle Film Roll">
+        <i data-lucide="film"></i>
+        <span class="btn-roll-badge" id="btn-roll-badge">0</span>
+      </button>
     </main>
 
-    <!-- Right Panel: Film Strip Ribbon -->
-    <aside class="film-ribbon-section">
-
-
+    <!-- Floating Film Strip Ribbon Tray -->
+    <div class="floating-roll-tray" id="floating-roll-tray">
       <div class="ribbon-header">
         <h3>FILM ROLL</h3>
         <span class="count-badge" id="photo-count">00/36</span>
       </div>
-      <div class="sprocket-track-left"></div>
       
       <!-- Film frames list -->
       <div class="film-strip" id="film-strip">
@@ -137,16 +123,15 @@
         </div>
       </div>
       
-      <div class="sprocket-track-right"></div>
-      <div class="ribbon-footer" style="display: flex; flex-direction: column; gap: 8px; padding: 12px 16px;">
-        <button id="btn-collage" class="btn btn-primary" style="width: 100%; justify-content: center; font-weight: 700; letter-spacing: 0.05em;" disabled>
+      <div class="ribbon-footer" style="display: flex; gap: 8px; padding: 12px 16px;">
+        <button id="btn-collage" class="btn btn-primary" style="flex: 1; justify-content: center; font-weight: 700; letter-spacing: 0.05em;" disabled>
           <i data-lucide="grid"></i> CREATE COLLAGE
         </button>
-        <button id="btn-clear-film" class="btn btn-danger" style="width: 100%; justify-content: center;" disabled>
+        <button id="btn-clear-film" class="btn btn-danger" style="flex: 1; justify-content: center;" disabled>
           <i data-lucide="trash-2"></i> CLEAR ROLL
         </button>
       </div>
-    </aside>
+    </div>
   </div>
 
   <!-- Polaroid Printed Sheet Modal -->
@@ -255,9 +240,14 @@
           <p class="guide-text">Perform a <strong>Thumbs Up</strong> gesture to resume shooting</p>
         </div>
         
-        <button id="btn-popup-close" class="btn btn-secondary">
-          <i data-lucide="x"></i> CLOSE MANUALLY
-        </button>
+        <div class="popup-actions" style="display: flex; gap: 12px; width: 100%;">
+          <button id="btn-popup-download" class="btn btn-action" style="flex: 1; justify-content: center; gap: 8px;">
+            <i data-lucide="download"></i> DOWNLOAD SHEET
+          </button>
+          <button id="btn-popup-close" class="btn btn-secondary" style="flex: 1; justify-content: center; gap: 8px;">
+            <i data-lucide="x"></i> CLOSE MANUALLY
+          </button>
+        </div>
       </div>
     </div>
   </div>

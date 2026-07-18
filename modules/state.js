@@ -24,5 +24,6 @@ export const state = {
 
   // New state variables for 4-shot review popup
   popupOpen: false,
-  popupClosing: false
+  popupClosing: false,
+  rollOpen: false
 };

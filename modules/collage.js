@@ -43,15 +43,26 @@ export function drawImageContain(ctx, img, x, y, w, h) {
 }
 
 export function renderCollage(canvas, photos, title, activeTheme, collageLayout) {
-  const dc = canvas.getContext('2d');
-  const layout = collageLayout;
-  const cfg = THEME_CONFIGS[activeTheme] || THEME_CONFIGS.classic;
-  const selectedPhotos = photos.slice(0, 12); // Take up to 12
+  return new Promise((resolve) => {
+    const dc = canvas.getContext('2d');
+    const layout = collageLayout;
+    const cfg = THEME_CONFIGS[activeTheme] || THEME_CONFIGS.classic;
+    const selectedPhotos = photos.slice(0, 12); // Take up to 12
 
-  if (selectedPhotos.length === 0) {
-    dc.clearRect(0, 0, canvas.width, canvas.height);
-    return;
-  }
+    if (selectedPhotos.length === 0) {
+      dc.clearRect(0, 0, canvas.width, canvas.height);
+      resolve();
+      return;
+    }
+
+    const targetCount = layout === 'contact' ? Math.min(selectedPhotos.length, 12) : Math.min(selectedPhotos.length, 4);
+    let loadedCount = 0;
+    const checkResolve = () => {
+      loadedCount++;
+      if (loadedCount === targetCount) {
+        resolve();
+      }
+    };
 
   // 1. Grid layout (2x2 Polaroids collage)
   if (layout === 'grid') {
@@ -99,6 +110,8 @@ export function renderCollage(canvas, photos, title, activeTheme, collageLayout)
         dc.font = '10px Courier New, monospace';
         dc.fillStyle = '#666';
         dc.fillText(`${photo.date}  ${photo.time}`, cell.x + pad + 2, cell.y + cell.h - 18);
+        
+        checkResolve();
       };
       img.src = photo.dataUrl;
     };
@@ -153,6 +166,8 @@ export function renderCollage(canvas, photos, title, activeTheme, collageLayout)
         dc.fillText(String(photo.frameNum).padStart(2, '0'), x + w, y - 8);
         dc.textAlign = 'left';
         dc.fillText(`SNP35-${photo.time}`, x, y + imgH + 14);
+
+        checkResolve();
       };
       img.src = photo.dataUrl;
     };
@@ -222,6 +237,8 @@ export function renderCollage(canvas, photos, title, activeTheme, collageLayout)
           dc.lineTo(x + cellW - 20, y + 22);
           dc.stroke();
         }
+
+        checkResolve();
       };
       img.src = photo.dataUrl;
     };
@@ -229,5 +246,5 @@ export function renderCollage(canvas, photos, title, activeTheme, collageLayout)
     for (let i = 0; i < Math.min(selectedPhotos.length, 12); i++) {
       drawThumb(selectedPhotos[i], i);
     }
-  }
+  });
 }

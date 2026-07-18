@@ -71,9 +71,8 @@ async function startSystem() {
 function resizeCanvas() {
   const vw = elements.webcam.videoWidth || 1280;
   const vh = elements.webcam.videoHeight || 720;
-  const scale = Math.min(1, 640 / vw);
-  elements.canvas.width = (vw * scale) | 0;
-  elements.canvas.height = (vh * scale) | 0;
+  elements.canvas.width = vw;
+  elements.canvas.height = vh;
 }
 
 // ─── MediaPipe Initialization ────────────────────────────────────────

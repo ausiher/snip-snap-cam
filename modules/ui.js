@@ -29,6 +29,11 @@ export const elements = {
   btnPolaroidClose: document.getElementById('btn-polaroid-close'),
   gestureGuideText: document.getElementById('gesture-guide-text'),
   
+  // Floating roll controls
+  btnToggleRoll: document.getElementById('btn-toggle-roll'),
+  btnRollBadge: document.getElementById('btn-roll-badge'),
+  floatingRollTray: document.getElementById('floating-roll-tray'),
+
   // Collage controls
   btnCollage: document.getElementById('btn-collage'),
   collageModal: document.getElementById('collage-modal'),
@@ -41,6 +46,7 @@ export const elements = {
   // 4-snapshot popup elements
   popup: document.getElementById('snapshot-popup'),
   popupGrid: document.getElementById('popup-grid'),
+  btnPopupDownload: document.getElementById('btn-popup-download'),
   btnPopupClose: document.getElementById('btn-popup-close')
 };
 
@@ -130,6 +136,7 @@ export function appendToFilm(photo) {
   if (elements.filmPlaceholder) elements.filmPlaceholder.style.display = 'none';
   const num = String(photo.frameNum).padStart(2, '0');
   elements.photoCount.textContent = `${String(state.photos.length).padStart(2, '0')}/${state.maxPhotos}`;
+  if (elements.btnRollBadge) elements.btnRollBadge.textContent = state.photos.length;
 
   const el = document.createElement('div');
   el.className = 'film-frame';
@@ -180,6 +187,7 @@ export function removePhoto(id) {
   if (el) el.remove();
 
   elements.photoCount.textContent = `${String(state.photos.length).padStart(2, '0')}/${state.maxPhotos}`;
+  if (elements.btnRollBadge) elements.btnRollBadge.textContent = state.photos.length;
 
   if (state.photos.length === 0) {
     if (elements.filmPlaceholder) elements.filmPlaceholder.style.display = 'flex';
@@ -255,13 +263,15 @@ async function copyCanvasToClipboard(canvas) {
 
 // --- Initialize Share & Menu UI handlers ---
 export function initUI() {
-  // Start System & Settings
-  const themeBtns = document.querySelectorAll('.theme-btn');
-  themeBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      setActiveTheme(btn.getAttribute('data-theme'));
+  // Toggle Film Roll Tray
+  if (elements.btnToggleRoll) {
+    elements.btnToggleRoll.addEventListener('click', () => {
+      state.rollOpen = !state.rollOpen;
+      elements.floatingRollTray.classList.toggle('tray-active', state.rollOpen);
+      elements.btnToggleRoll.classList.toggle('active', state.rollOpen);
+      playTickSound();
     });
-  });
+  }
 
   // Footer UI toggles
   elements.btnToggleHud.addEventListener('click', () => {
@@ -289,6 +299,7 @@ export function initUI() {
     elements.filmStrip.querySelectorAll('.film-frame').forEach(f => f.remove());
     elements.filmPlaceholder.style.display = 'flex';
     elements.photoCount.textContent = `00/${state.maxPhotos}`;
+    if (elements.btnRollBadge) elements.btnRollBadge.textContent = '0';
     elements.btnClearFilm.setAttribute('disabled', 'true');
     elements.btnCollage.setAttribute('disabled', 'true');
   });
@@ -340,6 +351,15 @@ export function initUI() {
   }
   if (elements.popup) {
     elements.popup.querySelector('.popup-backdrop').addEventListener('click', closeSnapshotPopup);
+  }
+  if (elements.btnPopupDownload) {
+    elements.btnPopupDownload.addEventListener('click', async () => {
+      const latestPhotos = state.photos.slice(-4);
+      if (latestPhotos.length === 0) return;
+      const tempCanvas = document.createElement('canvas');
+      await renderCollage(tempCanvas, latestPhotos, 'SNIP SNAP! BATCH', state.activeTheme, 'grid');
+      downloadCanvas(tempCanvas, `snipsnap_batch_${Date.now()}.jpg`);
+    });
   }
 
   // Share menu triggers
