@@ -381,49 +381,24 @@ function calcRect(cw, ch, hands) {
 
   let center, W, H, theta, c1, c2, c3, c4, h3Bracket;
 
-  // Check if hands are at the same level (horizontal/bottom gesture)
-  if (Math.abs(dy) < Math.abs(dx) * 0.4) {
-    // Both hands are at the bottom of the viewfinder.
-    // Bottom-left corner = A, Bottom-right corner = B
-    W = Math.max(40, Math.sqrt(dx*dx + dy*dy));
-    // Average index-to-wrist span as the height
-    H = Math.max(40, (lenVA + lenVB) * 0.5);
-    theta = Math.atan2(B.y - A.y, B.x - A.x);
+  // Both hands are at the bottom of the viewfinder.
+  // Bottom-left corner = A, Bottom-right corner = B
+  W = Math.max(40, Math.sqrt(dx*dx + dy*dy));
+  // Average index-to-wrist span as the height
+  H = Math.max(40, (lenVA + lenVB) * 0.5);
+  theta = Math.atan2(B.y - A.y, B.x - A.x);
 
-    // Center shifted UP by half height from midpoint of A and B
-    center = {
-      x: (A.x + B.x) * 0.5 + upX * (H * 0.5),
-      y: (A.y + B.y) * 0.5 + upY * (H * 0.5)
-    };
+  // Center shifted UP by half height from midpoint of A and B
+  center = {
+    x: (A.x + B.x) * 0.5 + upX * (H * 0.5),
+    y: (A.y + B.y) * 0.5 + upY * (H * 0.5)
+  };
 
-    c4 = A; // bottom-left
-    c3 = B; // bottom-right
-    c1 = { x: A.x + H * upX, y: A.y + H * upY }; // top-left
-    c2 = { x: B.x + H * upX, y: B.y + H * upY }; // top-right
-    h3Bracket = 'bottom-right';
-  } else {
-    // Diagonal gesture. A is bottom-left (larger Y), B is top-right (smaller Y).
-    const V = { x: B.x - A.x, y: B.y - A.y };
-    W = Math.max(40, Math.abs(V.x * hzX + V.y * hzY));
-    H = Math.max(40, Math.abs(V.x * upX + V.y * upY));
-    theta = Math.atan2(hzY, hzX);
-    center = { x: (A.x + B.x) * 0.5, y: (A.y + B.y) * 0.5 };
-
-    if (A.y > B.y) {
-      // A is bottom-left, B is top-right
-      c4 = A; // bottom-left
-      c2 = B; // top-right
-      c1 = { x: A.x + H * upX, y: A.y + H * upY }; // top-left
-      c3 = { x: A.x + W * hzX, y: A.y + W * hzY }; // bottom-right
-    } else {
-      // A is top-left, B is bottom-right
-      c1 = A; // top-left
-      c3 = B; // bottom-right
-      c4 = { x: A.x - H * upX, y: A.y - H * upY }; // bottom-left
-      c2 = { x: A.x + W * hzX, y: A.y + W * hzY }; // top-right
-    }
-    h3Bracket = 'top-right';
-  }
+  c4 = A; // bottom-left
+  c3 = B; // bottom-right
+  c1 = { x: A.x + H * upX, y: A.y + H * upY }; // top-left
+  c2 = { x: B.x + H * upX, y: B.y + H * upY }; // top-right
+  h3Bracket = 'bottom-right';
 
   // Scale down width and height to sit inside the finger frame (yellow outline requirement)
   const shrinkFactor = 0.82;
