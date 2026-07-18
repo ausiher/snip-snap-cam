@@ -1,4 +1,4 @@
-import { OneEuroFilter } from './OneEuroFilter.js';
+import { OneEuroFilter } from './OneEuroFilter.js?v=4';
 
 export class FilterEngine {
   constructor(canvas, overlayCanvas) {

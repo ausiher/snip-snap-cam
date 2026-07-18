@@ -1,5 +1,5 @@
 import { FilesetResolver, FaceLandmarker } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/vision_bundle.mjs";
-import { FilterEngine } from './core/FilterEngine.js';
+import { FilterEngine } from './core/FilterEngine.js?v=4';
 
 /**
  * SNIP SNAP! // Gesture Retro Film Camera
