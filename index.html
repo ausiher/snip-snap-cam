@@ -8,8 +8,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
   <!-- MediaPipe CDNs -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
@@ -19,20 +17,34 @@
 <body>
   <!-- Main Application Container -->
   <div class="app-container">
-    <!-- Left Panel: Viewfinder (Now covers entire page) -->
+    <!-- Viewfinder (Full Screen) -->
     <main class="viewfinder-section">
       <div class="canvas-wrapper">
         <!-- Hidden source video stream -->
         <video id="webcam" autoplay playsinline muted style="position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none;"></video>
         <!-- The rendering canvas -->
         <canvas id="viewfinder-canvas"></canvas>
+
+        <!-- Interactive Camera Permission Request Overlay -->
+        <div id="camera-permission-overlay" class="camera-permission-overlay hidden">
+          <div class="permission-card">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ffb000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+            <h2>CAMERA PERMISSION REQUIRED</h2>
+            <p>SNIP SNAP! needs access to your camera to detect hand gestures and capture 35mm retro snapshots.</p>
+            <button id="btn-enable-camera" class="btn btn-primary btn-lg">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+              ENABLE CAMERA
+            </button>
+            <p id="camera-status-msg" class="status-msg"></p>
+          </div>
+        </div>
         
         <!-- Retro Viewfinder Grid & HUD Layer -->
         <div class="hud-overlay">
           <!-- Floating Help Info Tooltip (Top Left) -->
           <div class="hud-info-floating">
             <button id="btn-toggle-info" class="btn-control-floating" title="Show Help Instructions">
-              <i data-lucide="help-circle"></i>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             </button>
             <div id="info-tooltip" class="info-tooltip-box hidden">
               <h3>HOW TO USE 📸</h3>
@@ -47,13 +59,13 @@
           <!-- Floating Controls (Top Right) -->
           <div class="hud-controls-floating">
             <button id="btn-toggle-hud" class="btn-control-floating" title="Toggle HUD Overlay">
-              <i data-lucide="eye"></i>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
             <button id="btn-toggle-landmarks" class="btn-control-floating" title="Toggle Tracking Dots">
-              <i data-lucide="circle-dot"></i>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/></svg>
             </button>
             <button id="btn-toggle-mirror" class="btn-control-floating" title="Mirror Camera Feed">
-              <i data-lucide="refresh-cw"></i>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
             </button>
           </div>
 
@@ -63,7 +75,7 @@
           <!-- Bottom Telemetry / Instructions overlay -->
           <div class="hud-bottom">
             <div class="gesture-guide" id="gesture-guide-text">
-              <i data-lucide="info" class="guide-icon pulse"></i>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="guide-icon pulse"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
               <span class="guide-msg">Raise two hands and make L-shapes to activate the focus frame</span>
             </div>
           </div>
@@ -75,7 +87,7 @@
 
       <!-- Floating Film Roll Toggle Button -->
       <button id="btn-toggle-roll" class="btn-floating-roll" title="Toggle Film Roll">
-        <i data-lucide="film"></i>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h4"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 12h4"/><path d="M17 16.5h4"/></svg>
         <span class="btn-roll-badge" id="btn-roll-badge">0</span>
       </button>
     </main>
@@ -91,7 +103,7 @@
       <div class="film-strip" id="film-strip">
         <!-- Film frames will be populated here -->
         <div class="film-strip-placeholder" id="film-placeholder">
-          <i data-lucide="film"></i>
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M3 7.5h4"/><path d="M3 12h4"/><path d="M3 16.5h4"/><path d="M17 3v18"/><path d="M17 7.5h4"/><path d="M17 12h4"/><path d="M17 16.5h4"/></svg>
           <p>No snapshots yet</p>
           <span>Use L gesture to frame and fold index to capture!</span>
         </div>
@@ -99,10 +111,10 @@
       
       <div class="ribbon-footer" style="display: flex; gap: 8px; padding: 12px 16px;">
         <button id="btn-collage" class="btn btn-primary" style="flex: 1; justify-content: center; font-weight: 700; letter-spacing: 0.05em;" disabled>
-          <i data-lucide="grid"></i> CREATE COLLAGE
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg> CREATE COLLAGE
         </button>
         <button id="btn-clear-film" class="btn btn-danger" style="flex: 1; justify-content: center;" disabled>
-          <i data-lucide="trash-2"></i> CLEAR ROLL
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg> CLEAR ROLL
         </button>
       </div>
     </div>
@@ -128,19 +140,19 @@
       <div class="polaroid-actions">
         <div class="share-dropdown-container">
           <button id="btn-polaroid-share" class="btn btn-action">
-            <i data-lucide="share-2"></i> SHARE PHOTO
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> SHARE PHOTO
           </button>
           <div class="share-dropdown-menu hidden" id="polaroid-share-menu">
             <button class="share-opt" data-action="download">
-              <i data-lucide="download"></i> Download Image
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Image
             </button>
             <button class="share-opt" data-action="copy">
-              <i data-lucide="copy"></i> Copy to Clipboard
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy to Clipboard
             </button>
           </div>
         </div>
         <button id="btn-polaroid-close" class="btn btn-secondary">
-          <i data-lucide="x"></i> CLOSE
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg> CLOSE
         </button>
       </div>
     </div>
@@ -171,19 +183,19 @@
         <div class="collage-actions">
           <div class="share-dropdown-container">
             <button id="btn-collage-share" class="btn btn-primary" style="width: 100%; justify-content: center; gap: 8px;">
-              <i data-lucide="share-2"></i> SHARE COLLAGE
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> SHARE COLLAGE
             </button>
             <div class="share-dropdown-menu hidden" id="collage-share-menu">
               <button class="share-opt" data-action="download">
-                <i data-lucide="download"></i> Download Image
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Image
               </button>
               <button class="share-opt" data-action="copy">
-                <i data-lucide="copy"></i> Copy to Clipboard
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg> Copy to Clipboard
               </button>
             </div>
           </div>
           <button id="btn-collage-close" class="btn btn-secondary" style="width: 100%; justify-content: center;">
-            <i data-lucide="x"></i> CLOSE
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg> CLOSE
           </button>
         </div>
       </div>
@@ -209,17 +221,17 @@
         
         <div class="popup-guide">
           <div class="thumb-icon-wrapper">
-            <i data-lucide="thumbs-up" class="thumb-icon pulse"></i>
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="thumb-icon pulse"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>
           </div>
           <p class="guide-text">Perform a <strong>Thumbs Up</strong> gesture to resume shooting</p>
         </div>
         
         <div class="popup-actions" style="display: flex; gap: 12px; width: 100%;">
           <button id="btn-popup-download" class="btn btn-action" style="flex: 1; justify-content: center; gap: 8px;">
-            <i data-lucide="download"></i> DOWNLOAD SHEET
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> DOWNLOAD SHEET
           </button>
           <button id="btn-popup-close" class="btn btn-secondary" style="flex: 1; justify-content: center; gap: 8px;">
-            <i data-lucide="x"></i> CLOSE MANUALLY
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg> CLOSE MANUALLY
           </button>
         </div>
       </div>

@@ -45,67 +45,77 @@ function getThemeOuterOverlay(progress) {
   }
 }
 
-// ─── Startup ─────────────────────────────────────────────────────────
+// ─── Startup & Camera Permission Handling ────────────────────────────
 async function startSystem() {
-  // Show a loading indicator on the canvas immediately
+  const permOverlay = document.getElementById('camera-permission-overlay');
+  const statusMsg = document.getElementById('camera-status-msg');
+
+  // Check for insecure context (e.g. file:// protocol without http/https server)
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    if (permOverlay) permOverlay.classList.remove('hidden');
+    if (statusMsg) {
+      statusMsg.style.color = '#ff4444';
+      statusMsg.innerHTML = '⚠️ <strong>Local file:// context detected!</strong><br>Browsers block camera access on <code>file://</code>.<br>Run via local server (e.g. <code>http://localhost:8080</code>) or Cloudflare Pages.';
+    }
+    return;
+  }
+
+  // Draw loading state on canvas
   const loadCtx = elements.canvas.getContext('2d');
   elements.canvas.width = window.innerWidth;
   elements.canvas.height = window.innerHeight;
   loadCtx.fillStyle = '#000';
   loadCtx.fillRect(0, 0, elements.canvas.width, elements.canvas.height);
-  loadCtx.fillStyle = 'rgba(255,255,255,0.5)';
+  loadCtx.fillStyle = 'rgba(255,255,255,0.7)';
   loadCtx.font = '14px "Space Grotesk", sans-serif';
   loadCtx.textAlign = 'center';
   loadCtx.fillText('Starting camera…', elements.canvas.width / 2, elements.canvas.height / 2);
 
-  // Camera constraint sets to try in order (prefer user-facing for selfie cam)
+  // Camera constraint sets to try in order
   const constraintsList = [
     { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }, audio: false },
     { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'environment' }, audio: false },
-    { video: true, audio: false }  // Absolute fallback — any camera
+    { video: true, audio: false }
   ];
 
   let stream = null;
   for (const constraints of constraintsList) {
     try {
       stream = await navigator.mediaDevices.getUserMedia(constraints);
-      break; // Success — exit loop
+      break;
     } catch (e) {
       console.warn('Camera attempt failed:', constraints, e);
     }
   }
 
   if (!stream) {
-    // All attempts failed — draw error on canvas
-    loadCtx.fillStyle = '#000';
-    loadCtx.fillRect(0, 0, elements.canvas.width, elements.canvas.height);
-    loadCtx.fillStyle = '#ff4444';
-    loadCtx.font = 'bold 16px "Space Grotesk", sans-serif';
-    loadCtx.textAlign = 'center';
-    loadCtx.fillText('⚠ Camera access denied', elements.canvas.width / 2, elements.canvas.height / 2 - 12);
-    loadCtx.fillStyle = 'rgba(255,255,255,0.4)';
-    loadCtx.font = '13px "Space Grotesk", sans-serif';
-    loadCtx.fillText('Grant camera permission and refresh', elements.canvas.width / 2, elements.canvas.height / 2 + 16);
+    // Show camera permission overlay so user can click to trigger permission prompt
+    if (permOverlay) permOverlay.classList.remove('hidden');
+    if (statusMsg) {
+      statusMsg.style.color = '#ffb000';
+      statusMsg.textContent = 'Camera permission required. Click "ENABLE CAMERA" above to allow access.';
+    }
     return;
   }
+
+  // Success — hide permission request overlay
+  if (permOverlay) permOverlay.classList.add('hidden');
 
   elements.webcam.srcObject = stream;
   elements.webcam.setAttribute('playsinline', '');
   elements.webcam.setAttribute('muted', '');
   elements.webcam.muted = true;
 
-  // Wait for video metadata to load (with timeout for slow mobile init)
   await new Promise((resolve) => {
     const onReady = () => {
       elements.webcam.removeEventListener('loadedmetadata', onReady);
       resolve();
     };
     elements.webcam.addEventListener('loadedmetadata', onReady);
-    // Safety timeout: resolve anyway after 5s
     setTimeout(resolve, 5000);
   });
 
-  try { await elements.webcam.play(); } catch (_) { /* autoplay blocked — ok, we keep trying in loop */ }
+  try { await elements.webcam.play(); } catch (_) {}
 
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
@@ -517,6 +527,13 @@ if (document.readyState === 'loading') {
 
 function boot() {
   initUI();
-  if (typeof lucide !== 'undefined') lucide.createIcons();
+  
+  const btnEnableCam = document.getElementById('btn-enable-camera');
+  if (btnEnableCam) {
+    btnEnableCam.addEventListener('click', () => {
+      startSystem();
+    });
+  }
+
   startSystem();
 }

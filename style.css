@@ -1822,3 +1822,68 @@ body.theme-sage {
   color: var(--ink-primary);
 }
 
+/* Camera Permission Request Overlay */
+.camera-permission-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.92);
+  backdrop-filter: blur(12px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.camera-permission-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.permission-card {
+  background: var(--bg-surface);
+  border: 1px solid oklch(0.3 0.01 25);
+  border-radius: var(--border-radius-lg);
+  padding: 32px 24px;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.permission-card h2 {
+  font-family: var(--font-sans);
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+  color: var(--ink-primary);
+}
+
+.permission-card p {
+  font-size: 0.85rem;
+  color: var(--ink-secondary);
+  line-height: 1.5;
+}
+
+.permission-card .status-msg {
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  margin-top: 4px;
+}
+
+.btn-lg {
+  padding: 14px 28px;
+  font-size: 1rem;
+  letter-spacing: 0.05em;
+  border-radius: var(--border-radius-md);
+}
+
+
