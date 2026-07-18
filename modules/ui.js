@@ -26,7 +26,6 @@ export const elements = {
   btnPolaroidShare: document.getElementById('btn-polaroid-share'),
   polaroidShareMenu: document.getElementById('polaroid-share-menu'),
   btnPolaroidClose: document.getElementById('btn-polaroid-close'),
-  gestureGuideText: document.getElementById('gesture-guide-text'),
   
   // Floating roll controls
   btnToggleRoll: document.getElementById('btn-toggle-roll'),
@@ -262,8 +261,46 @@ async function copyCanvasToClipboard(canvas) {
   }
 }
 
-// --- Initialize Share & Menu UI handlers ---
 export function initUI() {
+  Object.assign(elements, {
+    webcam: document.getElementById('webcam'),
+    canvas: document.getElementById('viewfinder-canvas'),
+    hudOverlay: document.querySelector('.hud-overlay'),
+    shutterFlash: document.getElementById('shutter-flash'),
+    filmStrip: document.getElementById('film-strip'),
+    filmPlaceholder: document.getElementById('film-placeholder'),
+    photoCount: document.getElementById('photo-count'),
+    btnClearFilm: document.getElementById('btn-clear-film'),
+    btnToggleHud: document.getElementById('btn-toggle-hud'),
+    btnToggleLandmarks: document.getElementById('btn-toggle-landmarks'),
+    btnToggleMirror: document.getElementById('btn-toggle-mirror'),
+    polaroidModal: document.getElementById('polaroid-modal'),
+    polaroidCard: document.getElementById('polaroid-card'),
+    polaroidImg: document.getElementById('polaroid-img'),
+    polaroidCaption: document.getElementById('polaroid-caption'),
+    polaroidDate: document.getElementById('polaroid-date'),
+    polaroidTime: document.getElementById('polaroid-time'),
+    btnPolaroidShare: document.getElementById('btn-polaroid-share'),
+    polaroidShareMenu: document.getElementById('polaroid-share-menu'),
+    btnPolaroidClose: document.getElementById('btn-polaroid-close'),
+    btnToggleRoll: document.getElementById('btn-toggle-roll'),
+    btnRollBadge: document.getElementById('btn-roll-badge'),
+    floatingRollTray: document.getElementById('floating-roll-tray'),
+    btnToggleInfo: document.getElementById('btn-toggle-info'),
+    infoTooltip: document.getElementById('info-tooltip'),
+    btnCollage: document.getElementById('btn-collage'),
+    collageModal: document.getElementById('collage-modal'),
+    collageCanvas: document.getElementById('collage-preview-canvas'),
+    btnCollageShare: document.getElementById('btn-collage-share'),
+    collageShareMenu: document.getElementById('collage-share-menu'),
+    btnCollageClose: document.getElementById('btn-collage-close'),
+    collageTitleInput: document.getElementById('collage-title-input'),
+    popup: document.getElementById('snapshot-popup'),
+    popupGrid: document.getElementById('popup-grid'),
+    btnPopupDownload: document.getElementById('btn-popup-download'),
+    btnPopupClose: document.getElementById('btn-popup-close')
+  });
+
   // Toggle Film Roll Tray
   if (elements.btnToggleRoll) {
     elements.btnToggleRoll.addEventListener('click', () => {
@@ -364,18 +401,22 @@ export function initUI() {
   }
 
   // Floating Info Tooltip bindings
-  if (elements.btnToggleInfo && elements.infoTooltip) {
-    elements.btnToggleInfo.addEventListener('click', (e) => {
+  const btnInfo = document.getElementById('btn-toggle-info');
+  const infoTooltip = document.getElementById('info-tooltip');
+  if (btnInfo && infoTooltip) {
+    btnInfo.addEventListener('click', (e) => {
       e.stopPropagation();
-      elements.infoTooltip.classList.toggle('hidden');
-      elements.btnToggleInfo.classList.toggle('active');
+      e.preventDefault();
+      const isHidden = infoTooltip.classList.contains('hidden');
+      infoTooltip.classList.toggle('hidden', !isHidden);
+      btnInfo.classList.toggle('active', isHidden);
     });
 
     document.addEventListener('click', (e) => {
-      if (!elements.infoTooltip.classList.contains('hidden')) {
-        if (!elements.infoTooltip.contains(e.target) && e.target !== elements.btnToggleInfo) {
-          elements.infoTooltip.classList.add('hidden');
-          elements.btnToggleInfo.classList.remove('active');
+      if (!infoTooltip.classList.contains('hidden')) {
+        if (!infoTooltip.contains(e.target) && !btnInfo.contains(e.target)) {
+          infoTooltip.classList.add('hidden');
+          btnInfo.classList.remove('active');
         }
       }
     });

@@ -234,13 +234,6 @@ function onHandResults(results) {
   // Focus double beep audio trigger
   if (state.isFraming && !wasFraming) {
     playFocusBeep();
-    const el = elements.gestureGuideText;
-    el.classList.add('active-focus');
-    el.querySelector('.guide-msg').textContent = 'FRAME LOCKED // Fold index to snap';
-  } else if (!state.isFraming && wasFraming) {
-    const el = elements.gestureGuideText;
-    el.classList.remove('active-focus');
-    el.querySelector('.guide-msg').textContent = 'Raise two hands in L-shapes to frame';
   }
   state.wasFraming = state.isFraming;
 
